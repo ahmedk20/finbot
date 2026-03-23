@@ -5,6 +5,11 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --include=dev
 
+# prisma generate must run before tsc — it creates the PrismaClient, Plan,
+# and Prisma types that the app imports. Schema must be present first.
+COPY prisma/ ./prisma/
+RUN npx prisma generate
+
 COPY tsconfig.json ./
 COPY src/ ./src/
 RUN npm run build
