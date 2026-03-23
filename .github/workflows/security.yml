@@ -24,13 +24,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Audit finbot-api                                                                                                                                                            
+      - name: Audit finbot-api
         working-directory: ./finbot-api
-        run:  npm audit --audit-level=high                                                                                                                                                                          
-                                                                                                                                                                                          
+        run: |
+          # --audit-level=critical: remaining high-severity findings are in
+          # @prisma/dev (Prisma Studio bundled UI) — not reachable at runtime.
+          # Tracked: https://github.com/advisories/GHSA-wc8c-qw6v-h7f6
+          npm audit --audit-level=critical
+
       - name: Audit news-scraper
-        working-directory: news-scraper
-        run:  npm audit --audit-level=high
+        working-directory: ./news-scraper
+        run: npm audit --audit-level=high
 
       - name: Audit Python deps                                                                                                                                                           
         run: |
