@@ -28,4 +28,4 @@ USER finbot
 ENV NODE_ENV=production
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["node", "dist/server.js"]
+CMD ["node", "dist/index.js"]

@@ -151,6 +151,7 @@ services:
       DD_ENV: production
       DD_VERSION: ${IMAGE_TAG:-latest}
       DD_AGENT_HOST: datadog-agent
+      NUMBA_CACHE_DIR: /tmp/numba_cache
     ports:
       - "8000:8000"
     networks:
