@@ -2,18 +2,21 @@ FROM python:3.13-slim
 WORKDIR /app
 
 # dumb-init: proper PID 1 signal handling for Python (equivalent of tini)
+# gcc + build-essential: needed to compile some Python packages (pandas, etc.)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends dumb-init \
+    && apt-get install -y --no-install-recommends dumb-init gcc build-essential \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy vendor/ before pip install — requirements.txt has -e vendor/TradingAgents
+# which needs the directory to exist at install time
 COPY requirements.txt ./
+COPY vendor/ ./vendor/
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Create user before COPY so --chown works
 RUN useradd -r -u 1001 -s /sbin/nologin finbot
 
-COPY --chown=finbot:finbot src/    ./src/
-COPY --chown=finbot:finbot vendor/ ./vendor/
+COPY --chown=finbot:finbot src/ ./src/
 
 USER finbot
 
