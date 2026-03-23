@@ -36,10 +36,12 @@ jobs:
         working-directory: ./news-scraper
         run: npm audit --audit-level=high
 
-      - name: Audit Python deps                                                                                                                                                           
+      - name: Audit Python deps
+        working-directory: ./trading-agents
         run: |
-          pip install pip-audit                                                                                                                                                                             
-          pip-audit -r trading-agents/requirements.txt         
+          pip install pip-audit
+          # --skip-editable: skip -e vendor/TradingAgents (local package, not third-party)
+          pip-audit -r requirements.txt --skip-editable         
   trivy-scan:                                                                                                                                                                             
     runs-on: ubuntu-latest                                                                                                                                                                
                                                                                                                                                                                             
