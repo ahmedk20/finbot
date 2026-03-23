@@ -21,4 +21,10 @@
     user_data = file("scripts/init.sh")
 
     tags = ["finbot", "production"]
+
+    # user_data only runs on first boot. Ignore changes so editing init.sh
+    # never causes an accidental destroy/recreate of the live server.
+    lifecycle {
+      ignore_changes = [user_data]
+    }
   }
