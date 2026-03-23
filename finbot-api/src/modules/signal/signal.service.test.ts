@@ -10,6 +10,7 @@ import * as l2 from '../../shared/cache/l2.cache';
 import * as sentimentService from '../sentiment/sentiment.service';
 import * as llmClient from '../../shared/llm/llm.client';
 import { computeSignal } from './signal.service';
+import { type SentimentLabel } from '../sentiment/sentiment.types';
 
 vi.mock('../../shared/cache/l2.cache');
 vi.mock('../sentiment/sentiment.service');
@@ -17,7 +18,7 @@ vi.mock('../../shared/llm/llm.client');
 
 const mockSentiment = (score: number) => ({
   asset: 'AAPL', score,
-  label: score > 0.2 ? 'bullish' : score < -0.2 ? 'bearish' : 'neutral' as const,
+  label: (score > 0.2 ? 'bullish' : score < -0.2 ? 'bearish' : 'neutral') as SentimentLabel,
   articleCount: 5, window: '24h' as const,
   breakdown: { bullish: 3, neutral: 1, bearish: 1 },
   computedAt: new Date().toISOString(),

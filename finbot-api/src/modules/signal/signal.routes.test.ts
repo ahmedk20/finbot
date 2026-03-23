@@ -51,7 +51,7 @@ async function createUserAndKey(plan: 'FREE' | 'PRO' = 'FREE'): Promise<string> 
     await prisma.user.update({ where: { email: TEST_EMAIL }, data: { plan } });
   }
   const loginRes = await request(app).post('/api/v1/auth/dashboard/login').send({ email: TEST_EMAIL, password: TEST_PASS });
-  const cookie = (loginRes.headers['set-cookie'] as string[])
+  const cookie = (loginRes.headers['set-cookie'] as unknown as string[])
     .find((c: string) => c.startsWith('access_token='))!.split(';')[0];
   const keyRes = await request(app).post('/api/v1/auth/keys').set('Cookie', cookie).send({ name: 'signal-test' });
   return keyRes.body.data.fullKey;

@@ -23,7 +23,7 @@ async function cleanup() {
 async function createUserAndKey(): Promise<string> {
   await request(app).post('/api/v1/auth/register').send({ email: TEST_EMAIL, password: TEST_PASS });
   const loginRes = await request(app).post('/api/v1/auth/dashboard/login').send({ email: TEST_EMAIL, password: TEST_PASS });
-  const cookie = (loginRes.headers['set-cookie'] as string[])
+  const cookie = (loginRes.headers['set-cookie'] as unknown as string[])
     .find((c: string) => c.startsWith('access_token='))!.split(';')[0];
   const keyRes = await request(app).post('/api/v1/auth/keys').set('Cookie', cookie).send({ name: 'usage-test' });
   return keyRes.body.data.fullKey;

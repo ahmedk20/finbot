@@ -23,7 +23,7 @@
  *    Without both, events are lost if RabbitMQ restarts mid-flight.
  */
 
-import amqplib, { type Connection, type Channel } from 'amqplib';
+import amqplib, { type ChannelModel, type Channel } from 'amqplib';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
 
@@ -35,7 +35,7 @@ export const QUEUE_API     = 'finbot.api.news';   // finbot-api binds this queue
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-let connection: Connection | null = null;
+let connection: ChannelModel | null = null;
 let channel:    Channel    | null = null;
 let reconnectAttempts = 0;
 

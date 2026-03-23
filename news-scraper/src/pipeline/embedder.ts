@@ -14,7 +14,7 @@ const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: t
 const BATCH_SIZE = 32;
 const limit      = pLimit(2);
 
-const hf = new HfInference(env.HUGGINGFACE_API_KEY, { provider: 'hf-inference' });
+const hf = new HfInference(env.HUGGINGFACE_API_KEY);
 
 async function embedBatch(texts: string[]): Promise<number[][] | null> {
   try {

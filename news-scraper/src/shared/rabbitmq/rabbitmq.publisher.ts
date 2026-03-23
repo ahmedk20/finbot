@@ -9,7 +9,7 @@
  * continues — we never block article processing for message delivery.
  */
 
-import amqplib, { type Connection, type Channel } from 'amqplib';
+import amqplib, { type ChannelModel, type Channel } from 'amqplib';
 import pino from 'pino';
 import { env } from '../../config/env';
 
@@ -18,7 +18,7 @@ const logger = pino({ transport: { target: 'pino-pretty', options: { colorize: t
 const EXCHANGE      = 'finbot.events';
 const EXCHANGE_TYPE = 'fanout';
 
-let connection: Connection | null = null;
+let connection: ChannelModel | null = null;
 let channel:    Channel    | null = null;
 
 export async function connectPublisher(): Promise<void> {

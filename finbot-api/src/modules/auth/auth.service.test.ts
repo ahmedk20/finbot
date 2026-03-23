@@ -25,9 +25,11 @@ function makeUser(overrides = {}) {
     id:        'user_1',
     email:     'test@example.com',
     password:  '$2b$12$validhashXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-    plan:      'FREE' as const,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    plan:             'FREE' as const,
+    createdAt:        new Date(),
+    updatedAt:        new Date(),
+    stripeCustomerId: null,
+    stripeSubId:      null,
     ...overrides,
   };
 }

@@ -112,7 +112,7 @@ describe('POST /api/v1/auth/dashboard/login', () => {
     expect(res.body.data.user.email).toBe(TEST_EMAIL);
 
     // Both tokens must be set as httpOnly cookies
-    const cookies = res.headers['set-cookie'] as string[];
+    const cookies = res.headers['set-cookie'] as unknown as string[];
     expect(cookies.some((c: string) => c.startsWith('access_token='))).toBe(true);
     expect(cookies.some((c: string) => c.startsWith('refresh_token='))).toBe(true);
     // httpOnly — JS cannot read them
@@ -145,7 +145,7 @@ describe('POST /api/v1/auth/keys', () => {
   async function loginAndGetCookie(): Promise<string> {
     await request(app).post('/api/v1/auth/register').send({ email: TEST_EMAIL, password: TEST_PASSWORD });
     const res = await request(app).post('/api/v1/auth/dashboard/login').send({ email: TEST_EMAIL, password: TEST_PASSWORD });
-    const cookies = (res.headers['set-cookie'] as string[]);
+    const cookies = (res.headers['set-cookie'] as unknown as string[]);
     const accessCookie = cookies.find((c: string) => c.startsWith('access_token='))!;
     // Extract just the value: "access_token=<value>; Path=..."
     return accessCookie.split(';')[0];
@@ -217,7 +217,7 @@ describe('GET /api/v1/auth/keys', () => {
   it('lists keys without exposing the keyHash', async () => {
     await request(app).post('/api/v1/auth/register').send({ email: TEST_EMAIL, password: TEST_PASSWORD });
     const loginRes = await request(app).post('/api/v1/auth/dashboard/login').send({ email: TEST_EMAIL, password: TEST_PASSWORD });
-    const cookie = (loginRes.headers['set-cookie'] as string[]).find((c: string) => c.startsWith('access_token='))!.split(';')[0];
+    const cookie = (loginRes.headers['set-cookie'] as unknown as string[]).find((c: string) => c.startsWith('access_token='))!.split(';')[0];
 
     await request(app).post('/api/v1/auth/keys').set('Cookie', cookie).send({ name: 'list-test' });
 
