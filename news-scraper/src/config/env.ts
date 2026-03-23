@@ -4,9 +4,11 @@ const envSchema = z.object({
   PINECONE_API_KEY:        z.string().min(1, 'PINECONE_API_KEY is required'),                                                                                                             
   PINECONE_INDEX_NAME:     z.string().min(1, 'PINECONE_INDEX_NAME is required'),                                                                                                          
   HUGGINGFACE_API_KEY:     z.string().min(1, 'HUGGINGFACE_API_KEY is required'),                                                                                                          
-  SCRAPER_CRON_SCHEDULE:   z.string().default('0 */2 * * *'),                                                                                                                             
+  SCRAPER_CRON_SCHEDULE:   z.string().default('0 */2 * * *'),
+  PRE_SIGNALS_CRON_SCHEDULE: z.string().default('*/30 * * * *'),
   SCRAPER_CONCURRENCY:     z.coerce.number().default(5),                                                                                                                                  
-  NODE_ENV:                z.enum(['development', 'production', 'test']).default('development'),                                                                                          
+  NODE_ENV:                z.enum(['development', 'production', 'test']).default('development'),
+  RABBITMQ_URL:            z.string().url().default('amqp://localhost:5672'),
 });                                                                                                                                                                                       
                                                                                                                                                                                           
 const parsed = envSchema.safeParse(process.env);                                                                                                                                        

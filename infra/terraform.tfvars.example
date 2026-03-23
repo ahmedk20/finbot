@@ -1,0 +1,17 @@
+  # Copy this file to terraform.tfvars and fill in your values
+  # cp terraform.tfvars.example terraform.tfvars
+
+  # DigitalOcean API token
+  # Get it from: DigitalOcean dashboard → API → Generate New Token
+  do_token = "your_digitalocean_api_token_here"
+
+  # Region — full list: https://slugs.do-api.dev
+  # nyc3 = New York, lon1 = London, ams3 = Amsterdam, sgp1 = Singapore
+  region = "nyc3"
+
+  # Droplet size — s-2vcpu-4gb is $24/mo, enough for all FinBot services
+  droplet_size = "s-2vcpu-4gb"
+
+  # Your SSH public key — paste the full contents of ~/.ssh/id_rsa.pub
+  # Generate one if you don't have it: ssh-keygen -t rsa -b 4096
+  ssh_public_key = "ssh-rsa AAAA..."

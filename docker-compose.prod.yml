@@ -1,0 +1,210 @@
+services:
+
+  # ── Infrastructure ───────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: finbot-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: finbot
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # No ports: postgres is internal only — not reachable from outside the host
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: finbot-redis
+    restart: always
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    # No ports: redis is internal only
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-alpine
+    container_name: finbot-rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    # No ports: rabbitmq is internal only, management UI disabled in prod
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── App Services ─────────────────────────────────────────────────────────────
+  finbot-api:
+    image: ghcr.io/${REPO}/finbot-api:${IMAGE_TAG:-latest}
+    container_name: finbot-api
+    restart: always
+    env_file: ./finbot-api/.env
+    environment:
+      # Unified Service Tagging — links logs, traces, and metrics in Datadog
+      DD_SERVICE: finbot-api
+      DD_ENV: production
+      DD_VERSION: ${IMAGE_TAG:-latest}
+      DD_AGENT_HOST: datadog-agent
+      DD_TRACE_AGENT_PORT: 8126
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - internal
+      - public
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      com.datadoghq.ad.logs: '[{"source":"nodejs","service":"finbot-api"}]'
+
+  news-scraper:
+    image: ghcr.io/${REPO}/news-scraper:${IMAGE_TAG:-latest}
+    container_name: finbot-news-scraper
+    restart: always
+    env_file: ./news-scraper/.env
+    environment:
+      DD_SERVICE: news-scraper
+      DD_ENV: production
+      DD_VERSION: ${IMAGE_TAG:-latest}
+      DD_AGENT_HOST: datadog-agent
+      DD_TRACE_AGENT_PORT: 8126
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.25'
+    labels:
+      com.datadoghq.ad.logs: '[{"source":"nodejs","service":"news-scraper"}]'
+
+  trading-agents:
+    image: ghcr.io/${REPO}/trading-agents:${IMAGE_TAG:-latest}
+    container_name: finbot-trading-agents
+    restart: always
+    env_file: ./trading-agents/.env
+    environment:
+      DD_SERVICE: trading-agents
+      DD_ENV: production
+      DD_VERSION: ${IMAGE_TAG:-latest}
+      DD_AGENT_HOST: datadog-agent
+    ports:
+      - "8000:8000"
+    networks:
+      - internal
+      - public
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: '1.0'
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      com.datadoghq.ad.logs: '[{"source":"python","service":"trading-agents"}]'
+
+  # ── Datadog Agent ─────────────────────────────────────────────────────────────
+  datadog-agent:
+    image: gcr.io/datadoghq/agent:7
+    container_name: finbot-datadog-agent
+    restart: always
+    environment:
+      DD_API_KEY: ${DD_API_KEY}
+      DD_SITE: us5.datadoghq.com
+      DD_LOGS_ENABLED: "true"
+      DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL: "true"
+      DD_CONTAINER_EXCLUDE: "name:finbot-datadog-agent"
+      DD_APM_ENABLED: "true"                        # receive traces from dd-trace
+      DD_DOGSTATSD_NON_LOCAL_TRAFFIC: "true"        # accept custom metrics from other containers
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+    internal: true   # no external internet access for infra services
+  public:
+    driver: bridge   # finbot-api and trading-agents reach the internet via this
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:

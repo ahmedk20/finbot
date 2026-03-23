@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Plan {
+  FREE
+  STARTER
+  PRO
+  BUSINESS
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  plan      Plan     @default(FREE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stripeCustomerId String?   // billing provider customer ID (cus_xxx or ctm_xxx)
+  stripeSubId      String?   // active subscription ID (sub_xxx or sub_xxx)
+
+  apiKeys       ApiKey[]
+  refreshTokens RefreshToken[]
+  usageLogs     UsageLog[]
+  webhooks      Webhook[]
+
+  @@index([email])
+}
+
+// Dashboard JWT sessions — one row per active session
+// Hashed before storage, rotated on every refresh (same pattern as food-delivery)
+model RefreshToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique  // SHA-256 of the raw token
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  keyHash    String    @unique
+  prefix     String    // shown in dashboard, e.g. "fb_xxxxx"
+  name       String?
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  revokedAt  DateTime?
+
+  @@index([userId])
+  @@index([keyHash])
+}
+
+// One score per article — pre-computed by BullMQ worker, read by /sentiment endpoints
+model SentimentScore {
+  id        String   @id @default(cuid())
+  articleId String   @unique  // Pinecone article ID — one score per article, upsert-safe
+  asset     String            // "BTC", "ETH", "AAPL"
+  score     Float             // -1.0 (very bearish) to +1.0 (very bullish)
+  label     String            // "bullish" | "bearish" | "neutral"
+  model     String            // which LLM model produced this (audit trail)
+  createdAt DateTime @default(now())
+
+  @@index([asset, createdAt]) // "BTC sentiment last 7 days" — primary read pattern
+  @@index([createdAt])        // admin scans, billing period aggregations
+}
+
+// One result per BullMQ analysis job — stores the full TradingAgents output
+model AnalysisResult {
+  id        String   @id @default(cuid())
+  jobId     String   @unique  // BullMQ job ID — matches the ID returned to caller
+  asset     String            // "BTC", "NVDA"
+  assetType String            // "crypto" | "stock" | "unknown"
+  date      String            // YYYY-MM-DD — trade date the analysis targets
+  decision  String            // "BUY" | "SELL" | "HOLD"
+  reasoning String            // final_trade_decision narrative text
+  reports   Json              // { market, sentiment, news, fundamentals, investment_plan }
+  createdAt DateTime @default(now())
+
+  @@index([asset, createdAt]) // "latest BTC analysis" — primary read pattern
+  @@index([createdAt])
+}
+
+// Webhook registrations — fire HTTP POST when threshold events occur
+model Webhook {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  url       String   // endpoint that receives the webhook payload
+  asset     String?  // null = all assets
+  event     String   // "sentiment_change" | "analysis_done" | "signal_change" | "news_alert"
+  threshold Float?   // for sentiment_change: fire when |score delta| >= threshold
+  secret    String   // HMAC-SHA256 signing key (plaintext — user never sees after creation)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([asset, event]) // lookup: "which webhooks care about BTC sentiment_change?"
+  @@index([userId])
+}
+
+// ── Stock profile cache ────────────────────────────────────────────────────────
+// Postgres is L2 cache — Redis (6h TTL) is L1 on top.
+// updatedAt drives TTL logic in stock.repository.ts (refresh if > 24h old).
+
+model StockProfile {
+  id          String   @id @default(cuid())
+  ticker      String   @unique
+  // FMP fields
+  name        String?
+  exchange    String?
+  sector      String?
+  industry    String?
+  description String?
+  ceo         String?
+  employees   Int?
+  website     String?
+  country     String?
+  ipoDate     String?
+  currency    String?
+  isEtf       Boolean?
+  // Snapshot fields (Polygon) — updated more frequently
+  price       Float?
+  change      Float?
+  changePct   Float?
+  marketCap   Float?
+  pe          Float?
+  eps         Float?
+  beta        Float?
+  weekHigh52  Float?
+  weekLow52   Float?
+  avgVolume   Float?
+  dcfValue    Float?
+  // AI-generated summary (non-blocking, may be null)
+  aiSummary   String?
+  aiSummaryAt DateTime?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@index([ticker])
+  @@index([updatedAt]) // TTL scan: "which profiles are stale?"
+}
+
+model StockFinancials {
+  id             String   @id @default(cuid())
+  ticker         String   @unique
+  period         String   // "quarter" | "annual"
+  incomeStatement Json
+  balanceSheet    Json
+  cashFlow        Json
+  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now())
+
+  @@index([ticker])
+}
+
+model StockAnalysts {
+  id                   String   @id @default(cuid())
+  ticker               String   @unique
+  grades               Json     // last 20 analyst grade changes
+  priceTargetConsensus Json     // { high, low, median, mean }
+  updatedAt            DateTime @updatedAt
+  createdAt            DateTime @default(now())
+
+  @@index([ticker])
+}
+
+model StockOwnership {
+  id            String   @id @default(cuid())
+  ticker        String   @unique
+  institutional Json     // top 10 institutional holders
+  etfs          Json     // top 10 ETF holders
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+
+  @@index([ticker])
+}
+
+// One row per API request — source of truth for billing and abuse detection
+model UsageLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint   String   // e.g. "news.list", "news.breaking"
+  plan       Plan     // snapshot of plan at request time — survives upgrades
+  statusCode Int      // 200, 429, 401 — used for abuse pattern detection
+  latency_ms Int
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt]) // "my usage this month" — most common query
+  @@index([createdAt])         // admin dashboards, billing period scans
+}

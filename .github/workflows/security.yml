@@ -1,0 +1,54 @@
+name: Security                                                                                                                                                                            
+   
+on:                                                                                                                                                                                       
+  push:                                                                                                                                                                                 
+    branches: [main]
+                                                                                                                                                                                            
+jobs:
+  secret-scan:                                                                                                                                                                            
+    runs-on: ubuntu-latest                                                                                                                                                              
+                                                                                                                                                                                            
+    steps:
+      - name: Checkout code                                                                                                                                                               
+        uses: actions/checkout@v4                                                                                                                                                                       
+
+      - name: Scan for secrets                                                                                                                                                            
+        uses: gitleaks/gitleaks-action@v2
+        env:                                                                                                                                                                              
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   
+
+  dependency-audit:
+    runs-on: ubuntu-latest                                                                                                                                                                
+                                                                                                                                                                                          
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Audit finbot-api                                                                                                                                                            
+        working-directory: ./finbot-api
+        run:  npm audit --audit-level=high                                                                                                                                                                          
+                                                                                                                                                                                          
+      - name: Audit news-scraper
+        working-directory: news-scraper
+        run:  npm audit --audit-level=high
+
+      - name: Audit Python deps                                                                                                                                                           
+        run: |
+          pip install pip-audit                                                                                                                                                                             
+          pip-audit -r trading-agents/requirements.txt         
+  trivy-scan:                                                                                                                                                                             
+    runs-on: ubuntu-latest                                                                                                                                                                
+                                                                                                                                                                                            
+    steps:                                                                                                                                                                              
+      - name: Checkout code
+        uses: actions/checkout@v4                                                                                                                                                                         
+   
+      - name: Scan finbot-api image                                                                                                                                                       
+        uses: aquasecurity/trivy-action@master                                                                                                                                          
+        with:                                                                                                                                                                             
+          scan-type: fs                                                                                                                                                                 
+          scan-ref: ./finbot-api                                                                                                                                                          
+          severity: HIGH,CRITICAL                                                                                                                                                         
+          exit-code: 1                                                                                                                                                                    
+
+                                                                                                                                                                   

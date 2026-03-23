@@ -1,0 +1,67 @@
+                                                                                                                                                                                           
+name: CI                                                                                                                                                                                  
+                                                                                                                                                                                            
+on:                                                                                                                                                                                     
+  pull_request:                                                                                                                                                                           
+    branches: [main]                                                                                                                                                                    
+
+jobs:                                                                                                                                                                                     
+  build-and-test-api:
+    runs-on: ubuntu-latest                                                                                                                                                                
+                                                                                                                                                                                            
+    steps:                                                                                                                                                                                
+      - name: Checkout code                                                                                                                                                               
+        uses: actions/checkout@v4                                                                                                                                                         
+                                                                                                                                                                                            
+      - name: Setup Node                                                                                                                                                                  
+        uses: actions/setup-node@v4                                                                                                                                                       
+        with:                                                                                                                                                                           
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: ./finbot-api/package-lock.json
+      - name: Install dependencies
+        working-directory: ./finbot-api
+        run: npm ci
+                                                                                                                                                                                            
+      - name: Lint                                                                                                                                                                        
+        working-directory: ./finbot-api                                                                                                                                                   
+        run: npm run lint                                                                                                                                                                 
+                                                                                                                                                                                          
+      - name: Test
+        working-directory: ./finbot-api
+        run: npm run test
+
+      - name: Build                                                                                                                                                                       
+        working-directory: ./finbot-api
+        run: npm run build               
+
+  build-and-test-scraper:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: ./news-scraper/package-lock.json
+      - name: Install dependencies
+        working-directory: ./news-scraper
+        run: npm ci
+
+      - name: Lint
+        working-directory: ./news-scraper
+        run: npm run lint
+
+      - name: Test
+        working-directory: ./news-scraper
+        run: npm test
+
+      - name: Build
+        working-directory: ./news-scraper
+        run: npm run build    
+                                                                                                                                                         
+                                             

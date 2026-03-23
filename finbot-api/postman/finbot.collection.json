@@ -1,0 +1,1014 @@
+{
+  "info": {
+    "name": "FinBot API",
+    "description": "Complete test collection for FinBot SaaS — financial news intelligence API.\n\n**Setup:**\n1. Import `finbot.environment.json` and select it as active environment\n2. Run `POST /auth/register` to create an account\n3. Run `POST /auth/login` to get tokens (auto-saved to env)\n4. Run `POST /auth/keys` to create an API key (auto-saved to env)\n5. All subsequent requests use `{{apiKey}}` automatically",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health",
+            "description": "Returns 200 if the server is running. No auth required."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has status field', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('ok');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "Registration, login, API key management. Tokens are automatically saved to environment variables.",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"trader@example.com\",\n  \"password\": \"StrongPass123!\",\n  \"name\": \"Test Trader\"\n}"
+            },
+            "description": "Create a new account. Returns user object with FREE plan."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Has user id', () => {",
+                  "  pm.expect(pm.response.json().data.id).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (API key auth)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"trader@example.com\",\n  \"password\": \"StrongPass123!\"\n}"
+            },
+            "description": "Login with email/password. Returns access + refresh tokens as HttpOnly cookies."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "// Extract cookies if using cookie jar",
+                  "const cookies = pm.cookies.toObject();",
+                  "if (cookies.accessToken)  pm.environment.set('accessToken',  cookies.accessToken);",
+                  "if (cookies.refreshToken) pm.environment.set('refreshToken', cookies.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dashboard Login (JWT)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/dashboard/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"trader@example.com\",\n  \"password\": \"StrongPass123!\"\n}"
+            },
+            "description": "Login for dashboard UI. Sets HttpOnly accessToken + refreshToken cookies."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dashboard Refresh Token",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/dashboard/refresh",
+            "description": "Use the refresh token cookie to get a new access token. Requires valid refreshToken cookie."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dashboard Logout",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/dashboard/logout",
+            "description": "Clears accessToken and refreshToken cookies."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List API Keys",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/auth/keys",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "List all API keys for the authenticated user."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns array', () => {",
+                  "  pm.expect(pm.response.json().data).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create API Key",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/keys",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-api-key", "value": "{{apiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"My Trading Bot\"\n}"
+            },
+            "description": "Create a new API key. The full key (fb_...) is only shown once — save it to the apiKey env variable immediately."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "if (body.data?.key) {",
+                  "  pm.environment.set('apiKey', body.data.key);",
+                  "  console.log('API key saved to environment:', body.data.key.slice(0,10) + '...');",
+                  "}",
+                  "if (body.data?.id) pm.environment.set('apiKeyId', body.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Revoke API Key",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/v1/auth/keys/{{apiKeyId}}",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "Revoke an API key by ID. Uses {{apiKeyId}} set by the Create API Key request."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "News",
+      "description": "News feed, breaking news, and historical context comparison.",
+      "item": [
+        {
+          "name": "List News",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/news?asset=BTC&limit=10&page=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "news"],
+              "query": [
+                { "key": "asset", "value": "BTC", "description": "Filter by asset (BTC, ETH, NVDA, AAPL...)" },
+                { "key": "limit", "value": "10" },
+                { "key": "page",  "value": "1" },
+                { "key": "severity", "value": "high", "disabled": true, "description": "Filter: low | medium | high" }
+              ]
+            },
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "Paginated news feed. Filterable by asset and severity."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Has articles array', () => pm.expect(body.data).to.be.an('array'));",
+                  "// Save first article ID for context test",
+                  "if (body.data?.length > 0) pm.environment.set('articleId', body.data[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Breaking News",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/news/breaking?asset=BTC",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "news", "breaking"],
+              "query": [
+                { "key": "asset", "value": "BTC", "description": "Optional asset filter" }
+              ]
+            },
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "Returns high-severity news from the last 24h. STARTER plan and above."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('All items are high severity', () => {",
+                  "  pm.response.json().data.forEach(item => {",
+                  "    pm.expect(item.severity).to.eql('high');",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Article by ID",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/news/{{articleId}}",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "Fetch a single article by ID. Set {{articleId}} from the List News response."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has article fields', () => {",
+                  "  const a = pm.response.json().data;",
+                  "  pm.expect(a.id).to.be.a('string');",
+                  "  pm.expect(a.title).to.be.a('string');",
+                  "  pm.expect(a.asset).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Article Historical Context",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/news/{{articleId}}/context",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "Vector-similarity search for past events similar to this article. Returns price outcomes (1d/7d/30d) for each historical match. PRO plan. Cached 30 min."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 402', () => {",
+                  "  pm.expect([200, 402, 404]).to.include(pm.response.code);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test('Has similar events', () => pm.expect(body.data.similarEvents).to.be.an('array'));",
+                  "  pm.test('Has pattern summary', () => pm.expect(body.data.patternSummary).to.be.an('object'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Signal",
+      "description": "Fast technical + sentiment signal engine. No LLM — computes in milliseconds.",
+      "item": [
+        {
+          "name": "Get Signal — BTC",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/signal/BTC",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "Composite signal for BTC: sentiment (35%) + RSI (25%) + MACD (18%) + BB (12%) + macro/FRED (10%). Returns outlook (bullish/neutral/bearish) + plain English summary. Cached 60s."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('Has outlook not decision', () => {",
+                  "  pm.expect(data.outlook).to.be.oneOf(['bullish', 'neutral', 'bearish']);",
+                  "  pm.expect(data.decision).to.be.undefined;",
+                  "});",
+                  "pm.test('Score is in [-1, 1]', () => {",
+                  "  pm.expect(data.score).to.be.at.least(-1).and.at.most(1);",
+                  "});",
+                  "pm.test('Has confidence', () => pm.expect(['low','medium','high']).to.include(data.confidence));",
+                  "pm.test('Has summary', () => pm.expect(data.summary).to.be.a('string').and.not.empty);",
+                  "pm.test('Has disclaimer', () => pm.expect(data.disclaimer).to.be.a('string').and.not.empty);",
+                  "pm.test('Has components array', () => pm.expect(data.components).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Signal — NVDA",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/signal/NVDA",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "Signal for a US stock. Same 5-component engine. Tests MACD normalisation with a real stock price."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('Asset is NVDA', () => pm.expect(data.asset).to.eql('NVDA'));",
+                  "pm.test('Score is numeric', () => pm.expect(data.score).to.be.a('number'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Signal — ETH",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/signal/ETH",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sentiment",
+      "description": "Aggregated news sentiment per asset. Powered by FinBERT.",
+      "item": [
+        {
+          "name": "Get Sentiment — BTC (24h)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sentiment/BTC?window=24h",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sentiment", "BTC"],
+              "query": [
+                { "key": "window", "value": "24h", "description": "1h | 6h | 24h | 7d" }
+              ]
+            },
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "Aggregated sentiment score for BTC across recent articles. Returns score in [-1,+1], label, article count."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('Score in range', () => pm.expect(data.score).to.be.within(-1, 1));",
+                  "pm.test('Label valid', () => pm.expect(['bullish','neutral','bearish']).to.include(data.label));",
+                  "pm.test('Has article count', () => pm.expect(data.articleCount).to.be.a('number'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Sentiment — AAPL (7d)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sentiment/AAPL?window=7d",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sentiment", "AAPL"],
+              "query": [
+                { "key": "window", "value": "7d" }
+              ]
+            },
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Analysis (Deep — PRO)",
+      "description": "Multi-agent TradingAgents analysis. Slow (30-120s). PRO plan only. Queued via BullMQ.",
+      "item": [
+        {
+          "name": "Submit Analysis Job",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/analysis",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-api-key", "value": "{{apiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"asset\": \"NVDA\",\n  \"date\": \"2026-03-20\"\n}"
+            },
+            "description": "Queue a deep multi-agent analysis. Returns jobId immediately. Poll /analysis/job/:jobId for results."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 202', () => pm.response.to.have.status(202));",
+                  "const body = pm.response.json();",
+                  "pm.test('Has jobId', () => pm.expect(body.data.jobId).to.be.a('string'));",
+                  "pm.environment.set('jobId', body.data.jobId);",
+                  "console.log('Job submitted:', body.data.jobId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Poll Job Status",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/analysis/job/{{jobId}}",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "Poll for job result. Status: queued → active → completed | failed. Run every 10-15s until completed."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('Has status', () => {",
+                  "  pm.expect(['queued','active','completed','failed']).to.include(data.status);",
+                  "});",
+                  "console.log('Job status:', data.status);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Latest Analysis for Asset",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/analysis/latest/NVDA",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "Fetch the most recent completed analysis for an asset."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', () => pm.expect([200, 404]).to.include(pm.response.code));",
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json().data;",
+                  "  pm.test('Has decision', () => pm.expect(['BUY','SELL','HOLD']).to.include(data.decision));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Stocks",
+      "description": "Stock fundamentals, financials, analyst ratings, ownership, and price charts.",
+      "item": [
+        {
+          "name": "Get Stock Profile — NVDA",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/stocks/NVDA",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "Basic stock profile: name, sector, market cap, 52-week range."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('Has ticker', () => pm.expect(data.ticker).to.eql('NVDA'));",
+                  "pm.test('Has name', () => pm.expect(data.name).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Full Stock Profile — NVDA",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/stocks/NVDA/full",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "Full profile including fundamentals, on-chain (if crypto), insider data."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Financials — AAPL",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/stocks/AAPL/financials",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "P/E, EPS, revenue, margins, debt-to-equity, ROE, etc."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('Has pe_ratio', () => pm.expect(data.pe_ratio).to.be.a('number'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Analyst Ratings — NVDA",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/stocks/NVDA/analysts",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "Wall Street analyst consensus: buy/hold/sell counts and price targets."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Ownership — NVDA",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/stocks/NVDA/ownership",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "Institutional and insider ownership breakdown."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Price Chart — NVDA (3mo)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/stocks/NVDA/chart?period=3mo",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "stocks", "NVDA", "chart"],
+              "query": [
+                { "key": "period", "value": "3mo", "description": "1mo | 3mo | 6mo | 1y | 2y" }
+              ]
+            },
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "OHLCV candles for charting. Returns array of daily candles."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns candles array', () => {",
+                  "  pm.expect(pm.response.json().data).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Chat",
+      "description": "AI chat grounded in FinBot's news + sentiment data.",
+      "item": [
+        {
+          "name": "Chat — Ask about BTC",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/chat",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-api-key", "value": "{{apiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"What is the current sentiment around Bitcoin and what are the key risks mentioned in recent news?\"\n    }\n  ],\n  \"asset\": \"BTC\"\n}"
+            },
+            "description": "LLM chat with context from FinBot's news data. STARTER plan and above."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('Has content', () => pm.expect(data.content).to.be.a('string').and.not.empty);",
+                  "pm.test('Has model used', () => pm.expect(data.model_used).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Chat — Multi-turn",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/chat",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-api-key", "value": "{{apiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messages\": [\n    { \"role\": \"user\",      \"content\": \"What's the outlook for NVDA?\" },\n    { \"role\": \"assistant\", \"content\": \"NVIDIA shows moderately bullish signals based on recent earnings and AI demand...\" },\n    { \"role\": \"user\",      \"content\": \"What are the biggest risks?\" }\n  ],\n  \"asset\": \"NVDA\"\n}"
+            },
+            "description": "Multi-turn conversation. Pass full message history in the messages array."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Stream (SSE)",
+      "description": "Server-Sent Events for real-time sentiment and news updates. Requires a short-lived stream token.",
+      "item": [
+        {
+          "name": "Generate Stream Token",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/stream/token",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "Exchange your API key for a short-lived SSE token (valid ~60s). Use the token as ?token= query param in SSE endpoints."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('Has token', () => pm.expect(data.token).to.be.a('string'));",
+                  "pm.environment.set('streamToken', data.token);",
+                  "console.log('Stream token saved. Connect to SSE endpoints with ?token=' + data.token.slice(0,15) + '...');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "SSE — Sentiment Stream (BTC)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/stream/sentiment/BTC?token={{streamToken}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "stream", "sentiment", "BTC"],
+              "query": [{ "key": "token", "value": "{{streamToken}}" }]
+            },
+            "description": "SSE stream. Opens a persistent connection — use EventSource in browser or 'curl -N' in terminal.\n\ncurl -N '{{baseUrl}}/api/v1/stream/sentiment/BTC?token={{streamToken}}'\n\nSends updates when sentiment changes. Test by ingesting new articles."
+          }
+        },
+        {
+          "name": "SSE — News Stream (BTC)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/stream/news/BTC?token={{streamToken}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "stream", "news", "BTC"],
+              "query": [{ "key": "token", "value": "{{streamToken}}" }]
+            },
+            "description": "SSE stream for real-time news events for an asset. Triggers when news-scraper publishes a high-severity article via RabbitMQ → Redis pub/sub.\n\ncurl -N '{{baseUrl}}/api/v1/stream/news/BTC?token={{streamToken}}'"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhooks",
+      "description": "Register HTTP endpoints to receive push notifications on critical events.",
+      "item": [
+        {
+          "name": "Create Webhook",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/webhooks",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-api-key", "value": "{{apiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://webhook.site/your-unique-id\",\n  \"events\": [\"news_alert\"],\n  \"assets\": [\"BTC\", \"ETH\"]\n}"
+            },
+            "description": "Register a webhook endpoint. Use https://webhook.site to get a free test URL. events: news_alert | sentiment_shift. BUSINESS plan."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('Has webhook id', () => pm.expect(data.id).to.be.a('string'));",
+                  "pm.environment.set('webhookId', data.id);",
+                  "console.log('Webhook created:', data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Webhooks",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/webhooks",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns array', () => pm.expect(pm.response.json().data).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Webhook",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/v1/webhooks/{{webhookId}}",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "Delete a webhook by ID. Uses {{webhookId}} set by Create Webhook."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Usage",
+      "description": "API usage tracking — requests made, limits, reset window.",
+      "item": [
+        {
+          "name": "Get Usage",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/usage",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "Returns current period API usage: requests made, daily limit, reset time."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('Has requests count', () => pm.expect(data.requests).to.be.a('number'));",
+                  "pm.test('Has limit', () => pm.expect(data.limit).to.be.a('number'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Billing",
+      "description": "Stripe checkout and customer portal. Use real or Stripe test-mode keys.",
+      "item": [
+        {
+          "name": "Create Checkout Session",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/billing/checkout",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-api-key", "value": "{{apiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plan\": \"PRO\"\n}"
+            },
+            "description": "Create a Stripe Checkout session. Returns a URL to redirect the user to. plan: STARTER | PRO | BUSINESS"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has checkout URL', () => {",
+                  "  pm.expect(pm.response.json().data.url).to.include('checkout.stripe.com');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Customer Portal Session",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/billing/portal",
+            "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+            "description": "Create a Stripe Customer Portal session for managing subscriptions/billing. Returns redirect URL."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has portal URL', () => {",
+                  "  pm.expect(pm.response.json().data.url).to.include('billing.stripe.com');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Internal",
+      "description": "Internal-only endpoints. Protected by X-Internal-Key header, not public API keys. Used by news-scraper to push sentiment scores.",
+      "item": [
+        {
+          "name": "Ingest Article Sentiment",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/internal/sentiment/ingest",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Internal-Key", "value": "{{internalKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"articleId\": \"article-uuid-here\",\n  \"asset\": \"BTC\",\n  \"score\": 0.72,\n  \"label\": \"bullish\"\n}"
+            },
+            "description": "Called by news-scraper after FinBERT scores a new article. Pushes score into Redis for real-time aggregation."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 401', () => pm.expect([200, 401]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

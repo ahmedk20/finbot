@@ -1,0 +1,8 @@
+# Terraform state — contains real infrastructure details (IPs, IDs)
+*.tfstate
+*.tfstate.backup
+# Provider plugins — like node_modules, downloaded by terraform init
+.terraform/
+
+# Your actual secret values — NEVER commit this
+terraform.tfvars

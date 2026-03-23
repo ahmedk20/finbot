@@ -1,0 +1,62 @@
+{
+  "id": "finbot-env",
+  "name": "FinBot Local",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "apiKey",
+      "value": "",
+      "type": "secret",
+      "enabled": true,
+      "description": "Full API key returned from POST /auth/keys (fb_...)"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true,
+      "description": "JWT access token cookie value — set automatically by the login test"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true,
+      "description": "JWT refresh token cookie value — set automatically by the login test"
+    },
+    {
+      "key": "apiKeyId",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "ID of a created API key — set automatically by the create-key test"
+    },
+    {
+      "key": "webhookId",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "ID of a created webhook — set automatically by the create-webhook test"
+    },
+    {
+      "key": "jobId",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "Analysis job ID — set automatically by the submit-analysis test"
+    },
+    {
+      "key": "streamToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true,
+      "description": "Short-lived SSE stream token — set automatically by the stream-token test"
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}
