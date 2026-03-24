@@ -25,20 +25,6 @@ resource "digitalocean_firewall" "finbot" {
       source_addresses = ["0.0.0.0/0", "::/0"]
     }
 
-    # finbot-api — REST API
-    inbound_rule {
-      protocol         = "tcp"
-      port_range       = "3000"
-      source_addresses = ["0.0.0.0/0", "::/0"]
-    }
-
-    # trading-agents — Python API
-    inbound_rule {
-      protocol         = "tcp"
-      port_range       = "8000"
-      source_addresses = ["0.0.0.0/0", "::/0"]
-    }
-
     # ── Outbound ──────────────────────────────────────────────────────────────
     # Allow all outbound — server needs to pull Docker images,
     # call external APIs (HuggingFace, Pinecone, Datadog, etc.)
