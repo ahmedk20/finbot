@@ -11,6 +11,3 @@
                                                                                                                                                                                             
   # TradingAgents — vendored inside this repo at vendor/TradingAgents/
   -e vendor/TradingAgents
-
-# Security overrides — pin vulnerable transitive dependencies to safe versions
-pygments>=2.20.0
