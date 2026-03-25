@@ -1,39 +1,74 @@
-                                                                                                                                                                                           
-name: CI                                                                                                                                                                                  
-                                                                                                                                                                                            
-on:                                                                                                                                                                                     
-  pull_request:                                                                                                                                                                           
-    branches: [main]                                                                                                                                                                    
+name: CI
 
-jobs:                                                                                                                                                                                     
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
   build-and-test-api:
-    runs-on: ubuntu-latest                                                                                                                                                                
-                                                                                                                                                                                            
-    steps:                                                                                                                                                                                
-      - name: Checkout code                                                                                                                                                               
-        uses: actions/checkout@v4                                                                                                                                                         
-                                                                                                                                                                                            
-      - name: Setup Node                                                                                                                                                                  
-        uses: actions/setup-node@v4                                                                                                                                                       
-        with:                                                                                                                                                                           
+    runs-on: ubuntu-latest
+
+    # Spin up Postgres and Redis alongside the job — integration tests need them
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: finbot
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
           node-version: 22
           cache: 'npm'
           cache-dependency-path: ./finbot-api/package-lock.json
+
       - name: Install dependencies
         working-directory: ./finbot-api
         run: npm ci
-                                                                                                                                                                                            
-      - name: Lint                                                                                                                                                                        
-        working-directory: ./finbot-api                                                                                                                                                   
-        run: npm run lint                                                                                                                                                                 
-                                                                                                                                                                                          
+
+      - name: Run database migrations
+        working-directory: ./finbot-api
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/finbot
+        run: npx prisma migrate deploy
+
+      - name: Lint
+        working-directory: ./finbot-api
+        run: npm run lint
+
       - name: Test
         working-directory: ./finbot-api
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/finbot
+          REDIS_URL: redis://localhost:6379
         run: npm run test
 
-      - name: Build                                                                                                                                                                       
+      - name: Build
         working-directory: ./finbot-api
-        run: npm run build               
+        run: npm run build
 
   build-and-test-scraper:
     runs-on: ubuntu-latest
@@ -48,6 +83,7 @@ jobs:
           node-version: 22
           cache: 'npm'
           cache-dependency-path: ./news-scraper/package-lock.json
+
       - name: Install dependencies
         working-directory: ./news-scraper
         run: npm ci
@@ -62,6 +98,4 @@ jobs:
 
       - name: Build
         working-directory: ./news-scraper
-        run: npm run build    
-                                                                                                                                                         
-                                             
+        run: npm run build

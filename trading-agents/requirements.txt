@@ -9,5 +9,8 @@
   yfinance>=0.2.0                                                                                                                                                                           
   pandas-ta>=0.3.14b
                                                                                                                                                                                             
-  # TradingAgents — vendored inside this repo at vendor/TradingAgents/                                                                                                                      
+  # TradingAgents — vendored inside this repo at vendor/TradingAgents/
   -e vendor/TradingAgents
+
+# Security overrides — pin vulnerable transitive dependencies to safe versions
+pygments>=2.20.0

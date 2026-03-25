@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     globals:     true,
     environment: 'node',
+    // Only run tests from src/ — not from compiled dist/
+    include:     ['src/**/*.test.ts'],
     // Sequential execution — integration tests share a real DB
     maxWorkers:  1,
     minWorkers:  1,

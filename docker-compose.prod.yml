@@ -195,6 +195,7 @@ services:
         condition: service_healthy
     networks:
       - internal
+      - public
     security_opt:
       - no-new-privileges:true
 
@@ -230,6 +231,7 @@ services:
       - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
     networks:
       - internal
+      - public
 
 networks:
   internal:

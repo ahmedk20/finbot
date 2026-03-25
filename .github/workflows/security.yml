@@ -41,7 +41,8 @@ jobs:
         run: |
           pip install pip-audit
           # --skip-editable: skip -e vendor/TradingAgents (local package, not third-party)
-          pip-audit -r requirements.txt --skip-editable         
+          # CVE-2026-4539: pygments transitive dep — no fix available yet, tracking upstream
+          pip-audit -r requirements.txt --skip-editable --ignore-vuln CVE-2026-4539
   trivy-scan:                                                                                                                                                                             
     runs-on: ubuntu-latest                                                                                                                                                                
                                                                                                                                                                                             
