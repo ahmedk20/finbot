@@ -7,7 +7,8 @@ RUN npm ci --include=dev
 
 # prisma generate must run before tsc — it creates the PrismaClient, Plan,
 # and Prisma types that the app imports. Schema must be present first.
-COPY prisma/ ./prisma/
+COPY prisma/        ./prisma/
+COPY prisma.config.ts ./
 RUN npx prisma generate
 
 COPY tsconfig.json ./
@@ -30,6 +31,7 @@ COPY --from=builder --chown=finbot:finbot /app/package.json ./
 COPY --from=builder --chown=finbot:finbot /app/node_modules  ./node_modules
 COPY --from=builder --chown=finbot:finbot /app/dist          ./dist
 COPY --chown=finbot:finbot prisma/                           ./prisma/
+COPY --chown=finbot:finbot prisma.config.ts                  ./
 
 USER finbot
 EXPOSE 3000
