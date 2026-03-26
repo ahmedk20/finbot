@@ -6,14 +6,26 @@ import { handleSubmit, handleJobStatus, handleLatest } from './analysis.controll
 
 const router = Router();
 
+// // POST /analysis — queue an analysis job
+// // PRO plan only (expensive — 8-15 LLM calls per job)
+// router.post('/',              authenticate, requirePlan('PRO'), rateLimit(), handleSubmit);
+
+// // GET /analysis/job/:jobId — poll job status
+// router.get('/job/:jobId',    authenticate, requirePlan('PRO'), handleJobStatus);
+
+// // GET /analysis/latest/:asset — most recent completed result for an asset
+// router.get('/latest/:asset', authenticate, requirePlan('PRO'), handleLatest);
+
+
+
 // POST /analysis — queue an analysis job
 // PRO plan only (expensive — 8-15 LLM calls per job)
-router.post('/',              authenticate, requirePlan('PRO'), rateLimit(), handleSubmit);
+router.post('/',              authenticate,  rateLimit(), handleSubmit);
 
 // GET /analysis/job/:jobId — poll job status
-router.get('/job/:jobId',    authenticate, requirePlan('PRO'), handleJobStatus);
+router.get('/job/:jobId',    authenticate, handleJobStatus);
 
 // GET /analysis/latest/:asset — most recent completed result for an asset
-router.get('/latest/:asset', authenticate, requirePlan('PRO'), handleLatest);
+router.get('/latest/:asset', authenticate,  handleLatest);
 
 export { router as analysisRouter };
