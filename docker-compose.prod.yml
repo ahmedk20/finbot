@@ -166,6 +166,7 @@ services:
       - /tmp
       - /app/vendor/TradingAgents/tradingagents/dataflows/data_cache
       - /home/finbot/.cache
+      - /app/eval_results
     deploy:
       resources:
         limits:
