@@ -1,6 +1,14 @@
+import { Agent, type Dispatcher } from 'undici';
 import { env } from '../config/env';
 import { CircuitBreaker } from '../utils/circuitBreaker';
 import { LLMError } from '../utils/errors';
+
+// Default fetch uses undici with headersTimeout=300s — too short for multi-agent LLM analysis.
+// This agent raises both timeouts to 11 minutes for long-running /analyze/ calls only.
+const longRunningAgent = new Agent({
+  headersTimeout: 660_000,
+  bodyTimeout:    660_000,
+});
 
 interface Message {
   role: 'system' | 'user' | 'assistant';
@@ -40,7 +48,7 @@ export interface AnalyzeResponse {
 
 const cb = new CircuitBreaker('trading-agents', { failureThreshold: 5, probeInterval: 30_000 });
 
-async function post<T>(path: string, body: unknown, timeoutMs: number): Promise<T> {
+async function post<T>(path: string, body: unknown, timeoutMs: number, dispatcher?: Dispatcher): Promise<T> {
   return cb.call(async () => {
     const res = await fetch(`${env.TRADING_AGENTS_URL}${path}`, {
       method: 'POST',
@@ -50,6 +58,8 @@ async function post<T>(path: string, body: unknown, timeoutMs: number): Promise<
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(timeoutMs),
+      // @ts-ignore — dispatcher is undici-specific, not in standard fetch types
+      dispatcher,
     });
 
     if (!res.ok) {
@@ -67,8 +77,9 @@ export function complete(messages: Message[], opts: CompleteOptions = {}): Promi
 }
 
 // Full TradingAgents multi-agent analysis — slow (30-600s), call from BullMQ worker only
+// Uses longRunningAgent to override undici's default 5-minute headersTimeout
 export function analyze(req: AnalyzeRequest): Promise<AnalyzeResponse> {
-  return post<AnalyzeResponse>('/analyze/', req, 600_000); // 10 min timeout
+  return post<AnalyzeResponse>('/analyze/', req, 600_000, longRunningAgent);
 }
 
 // Technical indicators — RSI, MACD, BB, EMA, ATR, VWAP via YFinance + pandas-ta
