@@ -165,6 +165,7 @@ services:
     tmpfs:
       - /tmp
       - /app/vendor/TradingAgents/tradingagents/dataflows/data_cache
+      - /home/finbot/.cache
     deploy:
       resources:
         limits:
