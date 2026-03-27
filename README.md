@@ -187,7 +187,7 @@ FinBot supports two auth methods:
 
 **API Keys (programmatic access)**
 - Generate from `/auth/keys`
-- Keys are prefixed: `fb_live_abc123...` — recognizable at a glance
+- Keys are prefixed:  — recognizable at a glance
 - Stored as bcrypt hashes — the raw key is shown only once at creation
 
 ---

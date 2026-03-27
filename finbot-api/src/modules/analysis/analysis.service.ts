@@ -22,10 +22,19 @@ export async function submitAnalysis(
 ): Promise<{ jobId: string }> {
   const jobId = `analysis:${input.asset}:${input.date}`;
 
+  // If the previous job with this ID failed, remove it before re-adding.
+  // BullMQ deduplication works by jobId — a failed job stays in the queue
+  // under the same ID and silently blocks new submissions for the same asset+date.
+  const existing = await analysisQueue.getJob(jobId);
+  if (existing) {
+    const state = await existing.getState();
+    if (state === 'failed') await existing.remove();
+  }
+
   await analysisQueue.add(
     'run-analysis',
     { asset: input.asset, date: input.date, userId },
-    { jobId },  // explicit jobId enables deduplication
+    { jobId },  // explicit jobId enables deduplication for non-failed jobs
   );
 
   return { jobId };
