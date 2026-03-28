@@ -43,7 +43,7 @@ function resolveTicker(asset: string, assetType: string): string {
 const worker = new Worker<AnalysisJobData>(
   'analysis',
   async (job) => {
-    const { asset, date } = job.data;
+    const { asset, date, output_language = 'English' } = job.data;
     const log = logger.child({ jobId: job.id, asset, date });
 
     log.info('Analysis job started');
@@ -57,7 +57,7 @@ const worker = new Worker<AnalysisJobData>(
     const ticker   = resolveTicker(asset, assetType);
 
     // 3. Run TradingAgents — this takes 15-120s, all in trading-agents service
-    const result = await analyze({ ticker, date, analysts });
+    const result = await analyze({ ticker, date, analysts, output_language });
     log.info({ decision: result.decision }, 'TradingAgents analysis complete');
 
     // 4. Persist result — upsert so retries don't create duplicates

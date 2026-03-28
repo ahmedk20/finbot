@@ -23,6 +23,12 @@ def _build_config() -> dict:
     return cfg
 
 
+def _build_config_for_request(req) -> dict:
+    cfg = _build_config()
+    cfg["output_language"] = req.output_language
+    return cfg
+
+
 async def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
     """
     Run TradingAgents full multi-agent analysis pipeline.
@@ -32,7 +38,7 @@ async def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
     import asyncio
     from tradingagents.graph.trading_graph import TradingAgentsGraph
 
-    cfg = _build_config()
+    cfg = _build_config_for_request(req)
 
     def _run() -> tuple:
         # selected_analysts must be a constructor arg — confirmed from source:

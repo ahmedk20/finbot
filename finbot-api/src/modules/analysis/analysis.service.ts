@@ -33,7 +33,7 @@ export async function submitAnalysis(
 
   await analysisQueue.add(
     'run-analysis',
-    { asset: input.asset, date: input.date, userId },
+    { asset: input.asset, date: input.date, userId, output_language: input.output_language },
     { jobId },  // explicit jobId enables deduplication for non-failed jobs
   );
 

@@ -32,6 +32,7 @@ export interface AnalyzeRequest {
   ticker: string;
   date: string; // YYYY-MM-DD
   analysts?: string[];
+  output_language?: string; // e.g. "English", "Arabic" — defaults to "English"
 }
 
 export interface AnalyzeResponse {

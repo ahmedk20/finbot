@@ -1,7 +1,8 @@
 export interface AnalysisJobData {
-  asset:  string;  // "BTC", "NVDA"
-  date:   string;  // YYYY-MM-DD — the trade date to analyse
-  userId: string;  // who submitted (for audit)
+  asset:           string;  // "BTC", "NVDA"
+  date:            string;  // YYYY-MM-DD — the trade date to analyse
+  userId:          string;  // who submitted (for audit)
+  output_language: string;  // language for analyst reports e.g. "English", "Arabic"
 }
 
 export interface AnalysisReports {

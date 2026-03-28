@@ -52,6 +52,7 @@ class AnalyzeRequest(BaseModel):
     analysts: list[str] = [
         "market", "social", "news", "fundamentals"
     ]
+    output_language: str = "English"     # language for analyst reports and final decision
 
 
 class AnalyzeResponse(BaseModel):
