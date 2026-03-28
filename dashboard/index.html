@@ -332,7 +332,7 @@ function ResultView({ d, isLive }) {
     sentiment:    isLive ? d.reports?.sentiment   : d.sentimentReport,
     news:         isLive ? d.reports?.news        : d.newsReport,
     fundamentals: isLive ? d.reports?.fundamentals: d.fundamentalsReport,
-    plan:         null, // rendered structurally
+    plan:         isLive ? d.reports?.investment_plan : null,
   };
 
   const planItems = isLive ? [] : (d.plan || []);
@@ -490,7 +490,7 @@ function ResultView({ d, isLive }) {
                   </div>
                 </div>
               )) : (
-                <div className="prose">{renderMd(tabContent.fundamentals) || <span className="report-empty">No investment plan data available.</span>}</div>
+                <div className={`prose${isArabic(tabContent.plan)?' rtl':''}`}>{renderMd(tabContent.plan) || <span className="report-empty">No investment plan data available.</span>}</div>
               )}
             </div>
           )}
