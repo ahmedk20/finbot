@@ -7,7 +7,7 @@
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@700;800&family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; }
@@ -24,7 +24,7 @@
 const { useState, useEffect, useRef, useCallback } = React;
 
 // ─── API ─────────────────────────────────────────────────────────────────────
-const API = 'https://finnbot.duckdns.org/api/v1';
+const API = '/api/v1';  // same-origin via nginx
 
 async function apiFetch(path, opts = {}) {
   const res = await fetch(`${API}${path}`, {
@@ -128,21 +128,27 @@ const css = `
   .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
   /* Markdown prose */
-  .prose { font-size: 13px; color: #4a6070; line-height: 1.85; }
-  .prose h1, .prose h2, .prose h3 { color: #8090a0; font-family: 'Syne', sans-serif; margin: 1rem 0 0.4rem; }
-  .prose h2 { font-size: 13px; border-bottom: 1px solid #0e1520; padding-bottom: 4px; }
-  .prose h3 { font-size: 12px; color: #5a7080; }
-  .prose p  { margin-bottom: 0.65rem; }
-  .prose ul, .prose ol { padding-left: 1.2rem; margin-bottom: 0.65rem; }
-  .prose li { margin-bottom: 0.3rem; font-size: 12px; }
-  .prose strong { color: #7090a0; }
-  .prose code { font-family: 'DM Mono', monospace; font-size: 11px; background: #0e1520; padding: 1px 5px; border-radius: 2px; color: #6b8cff; }
-  .prose table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; }
-  .prose th, .prose td { padding: 5px 10px; border: 1px solid #0e1520; font-size: 11px; text-align: left; }
+  .prose { font-size: 15px; color: #5a7080; line-height: 2; }
+  .prose.rtl { font-family: 'Cairo', sans-serif; direction: rtl; text-align: right; font-size: 17px; line-height: 2.2; color: #6a8090; }
+  .prose h1, .prose h2, .prose h3 { color: #8090a0; font-family: 'Syne', sans-serif; margin: 1.1rem 0 0.5rem; }
+  .prose.rtl h1, .prose.rtl h2, .prose.rtl h3 { font-family: 'Cairo', sans-serif; font-weight: 700; color: #90a0b0; }
+  .prose h2 { font-size: 15px; border-bottom: 1px solid #0e1520; padding-bottom: 5px; }
+  .prose h3 { font-size: 14px; color: #5a7080; }
+  .prose p  { margin-bottom: 0.8rem; }
+  .prose ul, .prose ol { padding-left: 1.4rem; margin-bottom: 0.8rem; }
+  .prose.rtl ul, .prose.rtl ol { padding-left: 0; padding-right: 1.6rem; }
+  .prose li { margin-bottom: 0.4rem; font-size: 14px; }
+  .prose.rtl li { font-size: 16px; }
+  .prose strong { color: #7a90a0; }
+  .prose code { font-family: 'DM Mono', monospace; font-size: 12px; background: #0e1520; padding: 1px 5px; border-radius: 2px; color: #6b8cff; }
+  .prose table { border-collapse: collapse; width: 100%; margin: 0.85rem 0; }
+  .prose th, .prose td { padding: 7px 12px; border: 1px solid #0e1520; font-size: 13px; text-align: left; }
+  .prose.rtl th, .prose.rtl td { text-align: right; }
   .prose th { color: #4a6070; background: #0a0e14; }
-  .prose blockquote { border-left: 2px solid #1e3545; padding-left: 12px; color: #3a5060; margin: 0.5rem 0; font-style: italic; }
+  .prose blockquote { border-left: 2px solid #1e3545; padding-left: 14px; color: #3a5060; margin: 0.6rem 0; font-style: italic; }
+  .prose.rtl blockquote { border-left: none; border-right: 2px solid #1e3545; padding-left: 0; padding-right: 14px; }
 
-  .report-empty { color: #1e3040; font-size: 12px; padding: 20px 0; }
+  .report-empty { color: #1e3040; font-size: 13px; padding: 20px 0; }
 `;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -161,6 +167,8 @@ function fmtPrice(n) {
 }
 
 // Very simple markdown → HTML renderer
+const isArabic = (text) => text && /[\u0600-\u06FF]/.test(text);
+
 function renderMd(md) {
   if (!md) return null;
   const lines = md.split('\n');
@@ -499,13 +507,13 @@ function ResultView({ d, isLive }) {
                   <div style={{fontSize:'11px',color:'#3a4d60'}}>Multi-factor AI analysis · {d.date}</div>
                 </div>
               </div>
-              <div className="prose">{renderMd(tabContent.reasoning)}</div>
+              <div className={`prose${isArabic(tabContent.reasoning)?' rtl':''}`}>{renderMd(tabContent.reasoning)}</div>
             </div>
           )}
 
           {/* All other text tabs */}
           {tab!=='reasoning' && tab!=='plan' && (
-            <div className="prose">
+            <div className={`prose${isArabic(tabContent[tab])?' rtl':''}`}>
               {tabContent[tab]
                 ? renderMd(tabContent[tab])
                 : <span className="report-empty">No data available for this report.</span>
@@ -589,6 +597,7 @@ function App() {
   const [authCheck, setAuthCheck] = useState(true); // waiting for initial token refresh
 
   const [assetInput, setAssetInput] = useState('BTC');
+  const [dateInput,  setDateInput]  = useState(new Date().toISOString().split('T')[0]);
   const [result,     setResult]     = useState(null);
   const [isLive,     setIsLive]     = useState(false);
 
@@ -642,7 +651,7 @@ function App() {
     setJobStatus('waiting');
     setResult(null);
     try {
-      const { jobId: jid } = await submitAnalysis(asset, new Date().toISOString().split('T')[0]);
+      const { jobId: jid } = await submitAnalysis(asset, dateInput);
       setJobId(jid);
       startPolling(jid);
     } catch (err) {
@@ -708,6 +717,12 @@ function App() {
       <div style={{background:'#0a0e14',borderBottom:'1px solid #111820',padding:'10px 24px',display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
         <span style={{fontFamily:"'Syne',sans-serif",fontSize:'16px',fontWeight:'800',color:'#fff',letterSpacing:'0.05em',marginRight:'4px'}}>FINBOT</span>
         <input className="nav-input" value={assetInput} onChange={e=>setAssetInput(e.target.value.toUpperCase())} onKeyDown={e=>e.key==='Enter'&&runAnalysis()} placeholder="Ticker…"/>
+        <input
+          type="date"
+          value={dateInput}
+          onChange={e=>setDateInput(e.target.value)}
+          style={{background:'#111820',border:'1px solid #1a2535',borderRadius:'4px',padding:'6px 10px',color:'#8090a0',fontFamily:"'DM Mono',monospace",fontSize:'11px',outline:'none',colorScheme:'dark'}}
+        />
         <button className="nav-btn" onClick={runAnalysis} disabled={running}>{running?'Running…':'Run Analysis'}</button>
         <div style={{display:'flex',gap:'6px'}}>
           {Object.keys(MOCK).map(a=>(
