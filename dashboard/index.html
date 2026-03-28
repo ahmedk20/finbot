@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finbot — Analysis</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; }
+    body { background: #080b10; color: #c8d0e0; font-family: 'DM Mono', 'JetBrains Mono', monospace; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: #0d1117; }
+    ::-webkit-scrollbar-thumb { background: #2a3040; border-radius: 2px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── API ─────────────────────────────────────────────────────────────────────
+const API = 'https://finnbot.duckdns.org/api/v1';
+
+async function apiFetch(path, opts = {}) {
+  const res = await fetch(`${API}${path}`, {
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', ...opts.headers },
+    ...opts,
+  });
+  if (res.status === 401) throw Object.assign(new Error('Unauthorized'), { status: 401 });
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error?.message || 'API error');
+  return json.data;
+}
+
+// Auth
+const login  = (email, password) => apiFetch('/auth/dashboard/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+const logout = () => apiFetch('/auth/dashboard/logout', { method: 'POST' });
+const refresh = () => apiFetch('/auth/dashboard/refresh', { method: 'POST' });
+
+// Analysis
+const submitAnalysis = (asset, date) => apiFetch('/analysis', { method: 'POST', body: JSON.stringify({ asset, date }) });
+const pollJob        = (jobId)        => apiFetch(`/analysis/job/${encodeURIComponent(jobId)}`);
+const fetchLatest    = (asset)        => apiFetch(`/analysis/latest/${asset.toUpperCase()}`);
+
+// ─── CSS ─────────────────────────────────────────────────────────────────────
+const css = `
+  @keyframes ticker      { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+  @keyframes fadeUp      { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes pulse-red   { 0%,100% { box-shadow: 0 0 0 0 rgba(255,77,77,0.4);  } 50% { box-shadow: 0 0 0 8px rgba(255,77,77,0); } }
+  @keyframes pulse-green { 0%,100% { box-shadow: 0 0 0 0 rgba(77,255,145,0.4);} 50% { box-shadow: 0 0 0 8px rgba(77,255,145,0); } }
+  @keyframes pulse-yell  { 0%,100% { box-shadow: 0 0 0 0 rgba(245,200,66,0.4);} 50% { box-shadow: 0 0 0 8px rgba(245,200,66,0); } }
+  @keyframes spin        { to { transform: rotate(360deg); } }
+
+  .fade-up { animation: fadeUp 0.4s ease forwards; }
+  .tab-btn {
+    background: none; border: none; cursor: pointer;
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 10px 18px; color: #4a5568; transition: all 0.2s;
+    border-bottom: 2px solid transparent; white-space: nowrap;
+  }
+  .tab-btn:hover { color: #8892a4; }
+  .tab-btn.active { color: #e2e8f0; border-bottom-color: var(--dc, #6b8cff); }
+
+  .ind-row {
+    display: grid; grid-template-columns: 100px 110px 1fr;
+    align-items: center; padding: 9px 14px;
+    border-bottom: 1px solid #0e1520; gap: 10px; transition: background 0.15s;
+  }
+  .ind-row:hover { background: rgba(255,255,255,0.02); }
+  .ind-row:last-child { border-bottom: none; }
+
+  .signal-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 8px; border-radius: 3px;
+    font-size: 10px; letter-spacing: 0.05em;
+  }
+  .metric-cell { background: #0d1117; padding: 11px 14px; transition: background 0.15s; }
+  .metric-cell:hover { background: #111820; }
+  .risk-card  { border-radius: 4px; padding: 10px 12px; }
+
+  .nav-input {
+    background: #111820; border: 1px solid #1a2535; border-radius: 4px;
+    padding: 6px 12px; color: #c8d0e0; font-family: 'DM Mono', monospace;
+    font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+    outline: none; width: 100px; transition: border-color 0.2s;
+  }
+  .nav-input:focus { border-color: #2a3d5a; }
+  .nav-input::placeholder { color: #2a3545; text-transform: none; letter-spacing: 0; }
+
+  .nav-btn {
+    background: #1a2535; border: 1px solid #243040; border-radius: 4px;
+    padding: 6px 14px; color: #8090a0; font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 0.08em; cursor: pointer;
+    transition: all 0.15s; text-transform: uppercase;
+  }
+  .nav-btn:hover:not(:disabled) { background: #1e2d42; color: #c0d0e0; }
+  .nav-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .nav-btn.pinned { border-color: #304560; color: #a0b8d0; background: #162030; }
+
+  .spinner { width: 14px; height: 14px; border: 2px solid #1a2535; border-top-color: var(--sc,#6b8cff); border-radius: 50%; animation: spin 0.8s linear infinite; }
+
+  /* Login */
+  .login-card {
+    background: #0d1117; border: 1px solid #1a2535; border-radius: 8px;
+    padding: 32px 36px; width: 100%; max-width: 380px;
+  }
+  .login-input {
+    width: 100%; background: #080b10; border: 1px solid #1a2535; border-radius: 4px;
+    padding: 10px 14px; color: #c8d0e0; font-family: 'DM Mono', monospace;
+    font-size: 12px; outline: none; transition: border-color 0.2s; letter-spacing: 0.04em;
+  }
+  .login-input:focus { border-color: #2a3d5a; }
+  .login-input::placeholder { color: #1e2d3d; }
+  .login-btn {
+    width: 100%; padding: 11px; background: #162535; border: 1px solid #243d52;
+    border-radius: 4px; color: #80a8c8; font-family: 'DM Mono', monospace;
+    font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .login-btn:hover:not(:disabled) { background: #1a2d40; color: #a0c8e8; border-color: #2e4d6a; }
+  .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  /* Markdown prose */
+  .prose { font-size: 13px; color: #4a6070; line-height: 1.85; }
+  .prose h1, .prose h2, .prose h3 { color: #8090a0; font-family: 'Syne', sans-serif; margin: 1rem 0 0.4rem; }
+  .prose h2 { font-size: 13px; border-bottom: 1px solid #0e1520; padding-bottom: 4px; }
+  .prose h3 { font-size: 12px; color: #5a7080; }
+  .prose p  { margin-bottom: 0.65rem; }
+  .prose ul, .prose ol { padding-left: 1.2rem; margin-bottom: 0.65rem; }
+  .prose li { margin-bottom: 0.3rem; font-size: 12px; }
+  .prose strong { color: #7090a0; }
+  .prose code { font-family: 'DM Mono', monospace; font-size: 11px; background: #0e1520; padding: 1px 5px; border-radius: 2px; color: #6b8cff; }
+  .prose table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; }
+  .prose th, .prose td { padding: 5px 10px; border: 1px solid #0e1520; font-size: 11px; text-align: left; }
+  .prose th { color: #4a6070; background: #0a0e14; }
+  .prose blockquote { border-left: 2px solid #1e3545; padding-left: 12px; color: #3a5060; margin: 0.5rem 0; font-style: italic; }
+
+  .report-empty { color: #1e3040; font-size: 12px; padding: 20px 0; }
+`;
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const decisionColor = { BUY: '#4dff91', SELL: '#ff4d4d', HOLD: '#f5c842' };
+const decisionPulse = { BUY: 'pulse-green', SELL: 'pulse-red', HOLD: 'pulse-yell' };
+const signalStyle = {
+  bearish: { color: '#ff4d4d', bg: 'rgba(255,77,77,0.1)',   dot: '#ff4d4d' },
+  neutral: { color: '#f5c842', bg: 'rgba(245,200,66,0.1)',  dot: '#f5c842' },
+  info:    { color: '#6b8cff', bg: 'rgba(107,140,255,0.1)', dot: '#6b8cff' },
+  bullish: { color: '#4dff91', bg: 'rgba(77,255,145,0.1)',  dot: '#4dff91' },
+};
+
+function fmtPrice(n) {
+  if (n == null) return '—';
+  return n >= 1000 ? `$${Number(n).toLocaleString()}` : `$${Number(n).toFixed(2)}`;
+}
+
+// Very simple markdown → HTML renderer
+function renderMd(md) {
+  if (!md) return null;
+  const lines = md.split('\n');
+  const out = [];
+  let tableRows = [];
+  let inTable = false;
+  let ulItems = [];
+
+  const flush = () => {
+    if (inTable && tableRows.length) {
+      out.push(
+        <table key={`t${out.length}`}>
+          <tbody>{tableRows.map((r,i)=><tr key={i}>{r.map((c,j)=>i===0?<th key={j}>{c}</th>:<td key={j}>{c}</td>)}</tr>)}</tbody>
+        </table>
+      );
+      tableRows = []; inTable = false;
+    }
+    if (ulItems.length) {
+      out.push(<ul key={`ul${out.length}`}>{ulItems.map((x,i)=><li key={i}>{x}</li>)}</ul>);
+      ulItems = [];
+    }
+  };
+
+  lines.forEach((line, i) => {
+    if (line.startsWith('### ')) { flush(); out.push(<h3 key={i}>{line.slice(4)}</h3>); return; }
+    if (line.startsWith('## '))  { flush(); out.push(<h2 key={i}>{line.slice(3)}</h2>); return; }
+    if (line.startsWith('# '))   { flush(); out.push(<h1 key={i}>{line.slice(2)}</h1>); return; }
+    if (line.startsWith('> '))   { flush(); out.push(<blockquote key={i}>{line.slice(2)}</blockquote>); return; }
+    if (line.startsWith('- ') || line.startsWith('* ')) {
+      if (inTable) flush();
+      ulItems.push(line.slice(2));
+      return;
+    }
+    if (line.startsWith('|')) {
+      if (ulItems.length) flush();
+      inTable = true;
+      const cells = line.split('|').slice(1,-1).map(c=>c.trim());
+      if (!cells.every(c=>/^[-: ]+$/.test(c))) tableRows.push(cells);
+      return;
+    }
+    flush();
+    if (!line.trim()) { out.push(<br key={i}/>); return; }
+    // inline: **bold**, *italic*, `code`
+    const parts = line.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g).map((p, j) => {
+      if (p.startsWith('**') && p.endsWith('**')) return <strong key={j}>{p.slice(2,-2)}</strong>;
+      if (p.startsWith('*')  && p.endsWith('*'))  return <em key={j}>{p.slice(1,-1)}</em>;
+      if (p.startsWith('`')  && p.endsWith('`'))  return <code key={j}>{p.slice(1,-1)}</code>;
+      return p;
+    });
+    out.push(<p key={i}>{parts}</p>);
+  });
+  flush();
+  return out;
+}
+
+// ─── Mock data (fallback / demo) ──────────────────────────────────────────────
+const MOCK = {
+  BTC: {
+    asset:'BTC', assetType:'crypto', date:'2026-03-28', decision:'BUY', price:86420, priceChange:+3.2, priceChangeAbs:+2683,
+    tickerItems:['BTC $86,420 ▲3.2%','52W HIGH $109,588','52W LOW $49,200','RSI 58','MACD +412','MVRV Z 1.8','HASH 780 EH/s','VERDICT: BUY'],
+    metaBar:[{label:'Analysis Date',value:'March 28, 2026'},{label:'Job ID',value:'analysis:BTC:2026-03-28'},{label:'Asset Type',value:'Cryptocurrency'},{label:'Key Support',value:'$82,000 – $83,500'},{label:'Key Resistance',value:'$89,200 – $91,000'}],
+    indicators:[
+      {label:'50 SMA',value:'$79,840',signal:'bullish',note:'Price 8.2% above'},
+      {label:'200 SMA',value:'$71,220',signal:'bullish',note:'Price 21.3% above'},
+      {label:'10 EMA',value:'$85,190',signal:'bullish',note:'Price 1.4% above'},
+      {label:'MACD',value:'+412',signal:'bullish',note:'Bullish crossover'},
+      {label:'RSI (14)',value:'58.40',signal:'neutral',note:'Bullish, not OB'},
+      {label:'Bollinger Mid',value:'$84,100',signal:'bullish',note:'Price in upper half'},
+      {label:'ATR (14)',value:'$2,840',signal:'info',note:'High volatility'},
+      {label:'OBV',value:'↑ trend',signal:'bullish',note:'Accumulation'},
+    ],
+    indicatorSummary:'7/8 BULLISH',
+    fundamentals:[
+      {label:'Market Cap',value:'$1.71T'},{label:'Circulating',value:'19.85M'},{label:'Hash Rate',value:'780 EH/s'},
+      {label:'MVRV Z-Score',value:'1.8'},{label:'NVT Ratio',value:'48'},{label:'Exch Reserve',value:'2.1M BTC'},
+      {label:'HODLer Supply',value:'63.4%'},{label:'Funding Rate',value:'+0.015%'},{label:'Staking Yield',value:'N/A'},
+      {label:'L/S Ratio',value:'1.8 : 1'},{label:'Difficulty',value:'+1.2%'},{label:'Next Halving',value:'Apr 2028'},
+    ],
+    revBars:[{q:'Q2 \'25',val:19.8,growth:null},{q:'Q3 \'25',val:26.1,growth:'+31.8%'},{q:'Q4 \'25',val:33.4,growth:'+27.9%'},{q:'Q1 \'26',val:41.2,growth:'+23.4%'}],
+    revLabel:'ETF AUM ($B)',
+    riskMatrix:[
+      {factor:'ETF Inflows',impact:'HIGH',sentiment:'pos',icon:'📈'},{factor:'Halving Cycle',impact:'HIGH',sentiment:'pos',icon:'⚡'},
+      {factor:'On-chain Acc.',impact:'HIGH',sentiment:'pos',icon:'🔒'},{factor:'Macro (Fed)',impact:'MED',sentiment:'pos',icon:'🏦'},
+      {factor:'Whale Transfer',impact:'MED',sentiment:'neg',icon:'🐋'},{factor:'Regulation',impact:'MED',sentiment:'neg',icon:'⚠'},
+      {factor:'Leverage OI',impact:'LOW',sentiment:'neg',icon:'💸'},{factor:'Geopolitical',impact:'LOW',sentiment:'neg',icon:'🌍'},
+    ],
+    tabs:[{id:'reasoning',label:'Final Decision'},{id:'market',label:'Technical'},{id:'fundamentals',label:'Fundamentals'},{id:'sentiment',label:'Sentiment'},{id:'news',label:'Macro / News'},{id:'plan',label:'Trade Plan'}],
+    reasoning:`After weighing technical momentum, on-chain fundamentals, and macro context, the bullish thesis holds with conviction. Bitcoin is trading above all major moving averages with volume-confirmed accumulation, and the macro backdrop is supportive.\n\n1. ETF Inflow Streak Signals Institutional Demand — 12 consecutive days of net inflows into spot Bitcoin ETFs, with BlackRock recording a single-day $480M inflow.\n\n2. On-Chain Structure Is Bullish — HODLer supply at 63.4% (near ATH), exchange reserves declining, MVRV Z-score at 1.8 (not overvalued).\n\n3. Technical Setup Is Clean — Higher lows, price above 50/200 SMA, RSI at 58 without being overbought.\n\n4. Macro Tailwind — Fed pause speculation and two potential 2026 H2 rate cuts lifting risk assets broadly.`,
+    plan:[
+      {step:'01',action:'Enter Long',detail:'Primary entry $85,500–$86,800. Secondary add $82,500–$83,200 on any retest of support.'},
+      {step:'02',action:'Position Size',detail:'2–4% portfolio allocation. Scale in over 2–3 tranches. Do not FOMO into a single entry.'},
+      {step:'03',action:'Target T1',detail:'$91,000 — take 30% off. Risk/reward 3.7× from current levels.'},
+      {step:'04',action:'Target T2',detail:'$96,500 — take 40% off. Trail stop on remainder toward $105,000.'},
+      {step:'05',action:'Stop Loss',detail:'Hard stop $81,400 on daily close. Close full position on close below $80,000.'},
+    ],
+    marketReport:`Bitcoin is trading at $86,420, above all major moving averages, confirming a primary uptrend. The recent pullback to the $83,500 support zone found strong buyers, creating a textbook higher-low structure.\n\nMACD crossed bullish on the daily with expanding histogram bars, a +412 reading vs. the prior -180 crossover six weeks ago. OBV is trending higher, confirming that volume is driving the price action on the upside.\n\nKey observations: RSI at 58 is bullish without being overbought (> 70), giving room for further upside. Bollinger Bands expanding to the upside. ATR elevated at $2,840 — position sizing must account for this volatility.`,
+    sentimentReport:`Aggregate Sentiment Score: 72/100 (Bullish)\n\nTwitter/X: 74 — predominantly positive, led by ETF inflow narrative and Fed pause speculation.\nReddit (r/Bitcoin): 68 — constructive. Long-term holders remain unfazed by volatility.\nFear & Greed Index: 69 — Greed zone, not extreme.\n\nCrowd positioning is healthy — long/short ratio at 1.8:1 (net long, not extreme euphoria). Funding rates at +0.015%/8h are positive but well within normal range.`,
+    newsReport:`The macro backdrop this week has been broadly favorable for risk assets. Fed minutes published March 26 signaled two potential rate cuts in H2 2026, lifting equities, gold, and crypto simultaneously.\n\nBlackRock's Bitcoin ETF recorded a single-day $480M inflow — the largest since the ETF's January 2024 launch. EU MiCA enforcement updates are progressing on schedule — no immediate market impact.`,
+    fundamentalsReport: null,
+  }
+};
+
+// ─── Components ───────────────────────────────────────────────────────────────
+
+function TickerTape({ items, decision }) {
+  const dc = decisionColor[decision] || '#6b8cff';
+  return (
+    <div style={{background:'#0a0e14',borderBottom:'1px solid #111820',padding:'6px 0',overflow:'hidden'}}>
+      <div style={{display:'flex',animation:'ticker 30s linear infinite',width:'max-content'}}>
+        {[0,1].map(i=>(
+          <div key={i} style={{display:'flex',gap:'40px',paddingRight:'40px'}}>
+            {items.map((item,j)=>(
+              <span key={j} style={{fontSize:'10px',letterSpacing:'0.08em',whiteSpace:'nowrap',color:item.includes('VERDICT')?dc:'#2e3d50'}}>{item}</span>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function JobStatusBar({ status, jobId, error }) {
+  if (!status) return null;
+  const c = {waiting:'#6b8cff',active:'#f5c842',completed:'#4dff91',failed:'#ff4d4d'}[status] || '#6b8cff';
+  const msgs = {waiting:'Job queued — waiting for worker…',active:'Analysis running — fetching data, calling LLMs…',completed:'Analysis complete.',failed:'Job failed.'};
+  return (
+    <div style={{background:'#0a0e14',border:`1px solid ${c}22`,borderRadius:'4px',padding:'10px 16px',marginBottom:'20px',display:'flex',alignItems:'center',gap:'12px'}}>
+      {(status==='active'||status==='waiting') ? (
+        <div className="spinner" style={{'--sc':c}}/>
+      ) : (
+        <div style={{width:'6px',height:'6px',borderRadius:'50%',background:c}}/>
+      )}
+      <div>
+        <div style={{fontSize:'12px',color:'#8090a0'}}>{msgs[status]}{error ? ` ${error}` : ''}</div>
+        {jobId && <div style={{fontSize:'10px',color:'#2a3d50',marginTop:'2px'}}>job: {jobId}</div>}
+      </div>
+      <div style={{marginLeft:'auto',fontSize:'10px',letterSpacing:'0.08em',color:c,textTransform:'uppercase'}}>{status}</div>
+    </div>
+  );
+}
+
+function ResultView({ d, isLive }) {
+  const [tab, setTab] = useState('reasoning');
+  const dc = decisionColor[d.decision] || '#6b8cff';
+  const pulse = decisionPulse[d.decision];
+  const isUp = (d.priceChange||0) >= 0;
+
+  // Tabs map
+  const tabDefs = d.tabs || [
+    {id:'reasoning',label:'Final Decision'},
+    {id:'market',label:'Technical'},
+    {id:'fundamentals',label:'Fundamentals'},
+    {id:'sentiment',label:'Sentiment'},
+    {id:'news',label:'Macro / News'},
+    {id:'plan',label:'Trade Plan'},
+  ];
+
+  const tabContent = {
+    reasoning:    isLive ? d.reasoning       : d.reasoning,
+    market:       isLive ? d.reports?.market      : d.marketReport,
+    sentiment:    isLive ? d.reports?.sentiment   : d.sentimentReport,
+    news:         isLive ? d.reports?.news        : d.newsReport,
+    fundamentals: isLive ? d.reports?.fundamentals: d.fundamentalsReport,
+    plan:         null, // rendered structurally
+  };
+
+  const planItems = isLive ? [] : (d.plan || []);
+
+  const maxRevVal = d.revBars ? Math.max(...d.revBars.map(b=>b.val)) : 1;
+
+  return (
+    <div className="fade-up">
+      <style>{`:root{--dc:${dc}}`}</style>
+
+      {/* Header */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'24px',flexWrap:'wrap',gap:'16px'}}>
+        <div>
+          <div style={{display:'flex',alignItems:'center',gap:'14px',marginBottom:'6px'}}>
+            <span style={{fontFamily:"'Syne',sans-serif",fontSize:'42px',fontWeight:'800',color:'#fff',letterSpacing:'-1px',lineHeight:1}}>{d.asset}</span>
+            <div style={{display:'flex',flexDirection:'column',gap:'3px'}}>
+              <span style={{fontSize:'11px',color:'#2e4060',letterSpacing:'0.1em',textTransform:'uppercase'}}>{d.assetType==='crypto'?'CRYPTO':'NASDAQ'}</span>
+              <span style={{fontSize:'11px',color:'#2e4060'}}>{d.assetType==='crypto'?'Digital Asset':'Technology'}</span>
+            </div>
+            {isLive && <span style={{fontSize:'9px',color:'#4dff91',background:'rgba(77,255,145,0.08)',border:'1px solid rgba(77,255,145,0.2)',borderRadius:'3px',padding:'2px 6px',letterSpacing:'0.1em'}}>LIVE</span>}
+          </div>
+          {d.price && (
+            <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+              <span style={{fontFamily:"'Syne',sans-serif",fontSize:'28px',color:'#6a7a8a',fontWeight:'700'}}>{fmtPrice(d.price)}</span>
+              {d.priceChange != null && (
+                <span style={{fontSize:'13px',color:isUp?'#4dff91':'#ff4d4d'}}>
+                  {isUp?'▲':'▼'} {fmtPrice(Math.abs(d.priceChangeAbs||0))} ({isUp?'+':''}{Number(d.priceChange).toFixed(1)}%)
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        <div style={{
+          background:`rgba(${dc==='#4dff91'?'77,255,145':dc==='#ff4d4d'?'255,77,77':'245,200,66'},0.07)`,
+          border:`1px solid ${dc}44`,borderRadius:'6px',padding:'16px 28px',textAlign:'center',
+          animation:`${pulse} 2.5s ease infinite`,
+        }}>
+          <div style={{fontSize:'10px',color:`${dc}99`,letterSpacing:'0.15em',textTransform:'uppercase',marginBottom:'4px'}}>RECOMMENDATION</div>
+          <div style={{fontFamily:"'Syne',sans-serif",fontSize:'32px',fontWeight:'800',color:dc,letterSpacing:'2px'}}>{d.decision}</div>
+          <div style={{fontSize:'11px',color:`${dc}55`,marginTop:'3px'}}>
+            {d.decision==='BUY'?'Entry confirmed':d.decision==='SELL'?'Reduce / Exit':'Wait for catalyst'}
+          </div>
+        </div>
+      </div>
+
+      {/* Meta bar */}
+      <div style={{display:'flex',gap:'24px',marginBottom:'24px',flexWrap:'wrap'}}>
+        {(d.metaBar||[{label:'Date',value:d.date},{label:'Job ID',value:d.jobId},{label:'Asset Type',value:d.assetType}]).map((m,i)=>(
+          <div key={i} style={{fontSize:'11px'}}>
+            <span style={{color:'#1e2d3d',marginRight:'6px'}}>{m.label}:</span>
+            <span style={{color:'#4a6070'}}>{m.value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Two-col grid — only in demo/mock mode OR when indicators available */}
+      {!isLive && d.indicators && (
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'14px',marginBottom:'14px'}}>
+          {/* Indicators */}
+          <div style={{background:'#0d1117',border:'1px solid #1a2030',borderRadius:'6px',overflow:'hidden'}}>
+            <div style={{padding:'12px 16px',borderBottom:'1px solid #111820',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span style={{fontSize:'10px',letterSpacing:'0.12em',textTransform:'uppercase',color:'#3a4d60'}}>Technical Indicators</span>
+              <span style={{fontSize:'10px',color:d.indicators.filter(x=>x.signal==='bearish').length>4?'#ff4d4d':'#4dff91',letterSpacing:'0.08em'}}>{d.indicatorSummary}</span>
+            </div>
+            {d.indicators.map((ind,i)=>{
+              const s=signalStyle[ind.signal];
+              return (
+                <div key={i} className="ind-row">
+                  <span style={{fontSize:'11px',color:'#3a5060'}}>{ind.label}</span>
+                  <span style={{fontSize:'12px',color:'#b0bac8',fontWeight:'500'}}>{ind.value}</span>
+                  <span className="signal-badge" style={{background:s.bg,color:s.color}}>
+                    <span style={{width:'5px',height:'5px',borderRadius:'50%',background:s.dot,display:'inline-block',flexShrink:0}}/>
+                    {ind.note}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {/* Fundamentals grid */}
+          <div style={{background:'#0d1117',border:'1px solid #1a2030',borderRadius:'6px',overflow:'hidden'}}>
+            <div style={{padding:'12px 16px',borderBottom:'1px solid #111820'}}>
+              <span style={{fontSize:'10px',letterSpacing:'0.12em',textTransform:'uppercase',color:'#3a4d60'}}>Fundamental Metrics</span>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'1px',background:'#0e1520'}}>
+              {d.fundamentals.map((f,i)=>(
+                <div key={i} className="metric-cell">
+                  <div style={{fontSize:'9px',color:'#1e3040',letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:'5px'}}>{f.label}</div>
+                  <div style={{fontSize:'13px',color:'#c0cad5',fontWeight:'500'}}>{f.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Revenue bars — mock only */}
+      {!isLive && d.revBars && (
+        <div style={{background:'#0d1117',border:'1px solid #1a2030',borderRadius:'6px',padding:'16px 20px',marginBottom:'14px'}}>
+          <div style={{fontSize:'10px',letterSpacing:'0.12em',textTransform:'uppercase',color:'#3a4d60',marginBottom:'14px'}}>{d.revLabel}</div>
+          <div style={{display:'flex',alignItems:'flex-end',gap:'12px',height:'68px'}}>
+            {d.revBars.map((q,i)=>{
+              const h=Math.round((q.val/maxRevVal)*56);
+              return (
+                <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'4px'}}>
+                  <div style={{fontSize:'10px',color:'#4dff91',height:'14px',display:'flex',alignItems:'center'}}>{q.growth||''}</div>
+                  <div style={{width:'100%',position:'relative',height:`${h}px`,background:`rgba(77,255,145,${0.1+i*0.07})`,border:'1px solid rgba(77,255,145,0.18)',borderRadius:'2px 2px 0 0'}}>
+                    <div style={{position:'absolute',top:'-16px',left:'50%',transform:'translateX(-50%)',fontSize:'9px',color:'#3a5040',whiteSpace:'nowrap'}}>{q.val}B</div>
+                  </div>
+                  <div style={{fontSize:'10px',color:'#1e3040'}}>{q.q}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Risk matrix — mock only */}
+      {!isLive && d.riskMatrix && (
+        <div style={{background:'#0d1117',border:'1px solid #1a2030',borderRadius:'6px',padding:'16px 20px',marginBottom:'14px'}}>
+          <div style={{fontSize:'10px',letterSpacing:'0.12em',textTransform:'uppercase',color:'#3a4d60',marginBottom:'14px'}}>Risk / Catalyst Matrix</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'8px'}}>
+            {d.riskMatrix.map((r,i)=>{
+              const p=r.sentiment==='pos';
+              return (
+                <div key={i} className="risk-card" style={{background:p?'rgba(77,255,145,0.04)':'rgba(255,77,77,0.04)',border:`1px solid ${p?'rgba(77,255,145,0.1)':'rgba(255,77,77,0.1)'}`}}>
+                  <div style={{fontSize:'13px',marginBottom:'4px'}}>{r.icon}</div>
+                  <div style={{fontSize:'10px',color:'#3a5060',lineHeight:1.4,marginBottom:'4px'}}>{r.factor}</div>
+                  <div style={{fontSize:'9px',letterSpacing:'0.06em',color:p?'#3d8860':'#885050'}}>{r.impact} IMPACT</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div style={{background:'#0d1117',border:'1px solid #1a2030',borderRadius:'6px',overflow:'hidden'}}>
+        <div style={{display:'flex',borderBottom:'1px solid #111820',overflowX:'auto'}}>
+          {tabDefs.map(t=>(
+            <button key={t.id} className={`tab-btn ${tab===t.id?'active':''}`} onClick={()=>setTab(t.id)}>{t.label}</button>
+          ))}
+        </div>
+        <div style={{padding:'22px 24px',minHeight:'280px'}}>
+
+          {/* Trade plan (structured) */}
+          {tab==='plan' && (
+            <div style={{display:'flex',flexDirection:'column',gap:'14px'}}>
+              <div style={{fontSize:'10px',letterSpacing:'0.12em',color:'#3a4d60',textTransform:'uppercase',marginBottom:'8px'}}>Action Plan</div>
+              {planItems.length > 0 ? planItems.map((p,i)=>(
+                <div key={i} style={{display:'flex',gap:'16px',alignItems:'flex-start'}}>
+                  <span style={{fontFamily:"'Syne',sans-serif",fontSize:'22px',fontWeight:'800',color:'#1a2535',lineHeight:1,flexShrink:0,width:'32px'}}>{p.step}</span>
+                  <div>
+                    <div style={{fontSize:'11px',color:dc,letterSpacing:'0.08em',marginBottom:'3px',textTransform:'uppercase'}}>{p.action}</div>
+                    <div style={{fontSize:'13px',color:'#4a6070',lineHeight:1.65}}>{p.detail}</div>
+                  </div>
+                </div>
+              )) : (
+                <div className="prose">{renderMd(tabContent.fundamentals) || <span className="report-empty">No investment plan data available.</span>}</div>
+              )}
+            </div>
+          )}
+
+          {/* Final Decision — special header */}
+          {tab==='reasoning' && tabContent.reasoning && (
+            <div>
+              <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'18px'}}>
+                <div style={{width:'3px',height:'32px',background:dc,borderRadius:'2px'}}/>
+                <div>
+                  <div style={{fontFamily:"'Syne',sans-serif",fontSize:'15px',fontWeight:'700',color:'#e2e8f0'}}>
+                    Final Verdict: {d.decision}{d.decision==='BUY'?' / Enter Long':d.decision==='SELL'?' / Reduce Position':' / Hold & Monitor'}
+                  </div>
+                  <div style={{fontSize:'11px',color:'#3a4d60'}}>Multi-factor AI analysis · {d.date}</div>
+                </div>
+              </div>
+              <div className="prose">{renderMd(tabContent.reasoning)}</div>
+            </div>
+          )}
+
+          {/* All other text tabs */}
+          {tab!=='reasoning' && tab!=='plan' && (
+            <div className="prose">
+              {tabContent[tab]
+                ? renderMd(tabContent[tab])
+                : <span className="report-empty">No data available for this report.</span>
+              }
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div style={{marginTop:'16px',display:'flex',justifyContent:'space-between',flexWrap:'wrap',gap:'8px'}}>
+        <span style={{fontSize:'10px',color:'#131e2a'}}>FinBot Multi-Agent Analysis Engine · Job: {d.jobId||`analysis:${d.asset}:${d.date}`} · Generated {d.date}</span>
+        <span style={{fontSize:'10px',color:'#131e2a'}}>⚠ Not financial advice. For informational purposes only.</span>
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ onLoad }) {
+  return (
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'60px 24px',textAlign:'center'}}>
+      <div style={{fontFamily:"'Syne',sans-serif",fontSize:'28px',fontWeight:'800',color:'#0e1828',marginBottom:'12px'}}>NO ANALYSIS</div>
+      <div style={{fontSize:'12px',color:'#1a2d40',maxWidth:'320px',lineHeight:1.7,marginBottom:'24px'}}>Enter a ticker in the nav bar and hit Run Analysis, or load the latest result for an asset.</div>
+      <div style={{display:'flex',gap:'8px'}}>
+        {Object.keys(MOCK).map(a=>(
+          <button key={a} className="nav-btn" onClick={()=>onLoad(a)}>{a}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LoginScreen({ onLogin }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError(''); setLoading(true);
+    try {
+      await login(email, password);
+      onLogin();
+    } catch (err) {
+      setError(err.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:'24px'}}>
+      <div style={{fontFamily:"'Syne',sans-serif",fontSize:'22px',fontWeight:'800',color:'#fff',letterSpacing:'0.1em'}}>FINBOT</div>
+      <form onSubmit={submit} className="login-card">
+        <div style={{marginBottom:'24px'}}>
+          <div style={{fontFamily:"'Syne',sans-serif",fontSize:'16px',fontWeight:'700',color:'#e2e8f0',marginBottom:'4px'}}>Sign In</div>
+          <div style={{fontSize:'11px',color:'#2a3d50'}}>Multi-Agent Analysis Dashboard</div>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+          <div>
+            <div style={{fontSize:'10px',color:'#2a3d50',letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:'6px'}}>Email</div>
+            <input className="login-input" type="email" placeholder="you@example.com" value={email} onChange={e=>setEmail(e.target.value)} required />
+          </div>
+          <div>
+            <div style={{fontSize:'10px',color:'#2a3d50',letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:'6px'}}>Password</div>
+            <input className="login-input" type="password" placeholder="••••••••" value={password} onChange={e=>setPassword(e.target.value)} required />
+          </div>
+          {error && <div style={{fontSize:'11px',color:'#ff4d4d',background:'rgba(255,77,77,0.08)',border:'1px solid rgba(255,77,77,0.2)',borderRadius:'3px',padding:'8px 12px'}}>{error}</div>}
+          <button className="login-btn" type="submit" disabled={loading}>{loading ? 'Signing in…' : 'Sign In'}</button>
+        </div>
+        <div style={{marginTop:'16px',textAlign:'center',fontSize:'10px',color:'#1a2535'}}>API: localhost:3000</div>
+      </form>
+    </div>
+  );
+}
+
+// ─── App ─────────────────────────────────────────────────────────────────────
+function App() {
+  const [authed,    setAuthed]    = useState(false);
+  const [authCheck, setAuthCheck] = useState(true); // waiting for initial token refresh
+
+  const [assetInput, setAssetInput] = useState('BTC');
+  const [result,     setResult]     = useState(null);
+  const [isLive,     setIsLive]     = useState(false);
+
+  const [jobStatus,  setJobStatus]  = useState(null);
+  const [jobId,      setJobId]      = useState(null);
+  const [jobError,   setJobError]   = useState(null);
+  const [running,    setRunning]    = useState(false);
+
+  const pollRef = useRef(null);
+
+  // Try to restore session silently on mount
+  useEffect(() => {
+    refresh()
+      .then(() => setAuthed(true))
+      .catch(() => {})
+      .finally(() => setAuthCheck(false));
+  }, []);
+
+  const stopPoll = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
+
+  const startPolling = useCallback((jid) => {
+    stopPoll();
+    pollRef.current = setInterval(async () => {
+      try {
+        const data = await pollJob(jid);
+        setJobStatus(data.status);
+        if (data.status === 'completed') {
+          stopPoll();
+          setRunning(false);
+          if (data.result) {
+            setResult(data.result);
+            setIsLive(true);
+          }
+          setTimeout(() => setJobStatus(null), 2000);
+        } else if (data.status === 'failed') {
+          stopPoll();
+          setRunning(false);
+          setJobError(data.error || 'Job failed');
+        }
+      } catch (err) {
+        if (err.status === 401) { stopPoll(); setAuthed(false); }
+      }
+    }, 2000);
+  }, []);
+
+  const runAnalysis = async () => {
+    const asset = assetInput.trim().toUpperCase();
+    if (!asset || running) return;
+    setRunning(true);
+    setJobError(null);
+    setJobStatus('waiting');
+    setResult(null);
+    try {
+      const { jobId: jid } = await submitAnalysis(asset, new Date().toISOString().split('T')[0]);
+      setJobId(jid);
+      startPolling(jid);
+    } catch (err) {
+      if (err.status === 401) { setAuthed(false); return; }
+      setJobError(err.message);
+      setJobStatus('failed');
+      setRunning(false);
+    }
+  };
+
+  const loadLatest = async (asset) => {
+    setAssetInput(asset);
+    setJobStatus(null);
+    try {
+      const data = await fetchLatest(asset);
+      setResult(data);
+      setIsLive(true);
+    } catch (err) {
+      if (err.status === 401) { setAuthed(false); return; }
+      // Fallback to mock
+      if (MOCK[asset]) { setResult(MOCK[asset]); setIsLive(false); }
+      else setResult(null);
+    }
+  };
+
+  const loadMock = (asset) => {
+    setAssetInput(asset);
+    setJobStatus(null);
+    setResult(MOCK[asset] || null);
+    setIsLive(false);
+  };
+
+  const doLogout = async () => {
+    await logout().catch(()=>{});
+    setAuthed(false);
+    setResult(null);
+  };
+
+  const tickerItems = result?.tickerItems || (result ? [`${result.asset} · ${result.decision}`, `Date: ${result.date}`, `Job: ${result.jobId||'—'}`] : ['FINBOT', 'MULTI-AGENT ANALYSIS ENGINE', 'ENTER A TICKER TO BEGIN']);
+
+  if (authCheck) {
+    return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',color:'#1e2d40',fontSize:'11px',letterSpacing:'0.1em'}}>INITIALISING…</div>;
+  }
+
+  if (!authed) {
+    return (
+      <>
+        <style>{css}</style>
+        <LoginScreen onLogin={() => setAuthed(true)} />
+      </>
+    );
+  }
+
+  const tickerDecision = result?.decision || 'HOLD';
+
+  return (
+    <div style={{background:'#080b10',color:'#c8d0e0',minHeight:'100vh',fontFamily:"'DM Mono',monospace"}}>
+      <style>{css}</style>
+
+      <TickerTape items={tickerItems} decision={tickerDecision}/>
+
+      {/* Nav */}
+      <div style={{background:'#0a0e14',borderBottom:'1px solid #111820',padding:'10px 24px',display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
+        <span style={{fontFamily:"'Syne',sans-serif",fontSize:'16px',fontWeight:'800',color:'#fff',letterSpacing:'0.05em',marginRight:'4px'}}>FINBOT</span>
+        <input className="nav-input" value={assetInput} onChange={e=>setAssetInput(e.target.value.toUpperCase())} onKeyDown={e=>e.key==='Enter'&&runAnalysis()} placeholder="Ticker…"/>
+        <button className="nav-btn" onClick={runAnalysis} disabled={running}>{running?'Running…':'Run Analysis'}</button>
+        <div style={{display:'flex',gap:'6px'}}>
+          {Object.keys(MOCK).map(a=>(
+            <button key={a} className={`nav-btn ${result?.asset===a?'pinned':''}`} onClick={()=>loadLatest(a)}>{a}</button>
+          ))}
+        </div>
+        <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:'12px'}}>
+          <span style={{fontSize:'10px',color:'#1e2d3d',letterSpacing:'0.06em'}}>
+            {isLive ? '● LIVE DATA' : '○ DEMO MODE'}
+          </span>
+          <button className="nav-btn" onClick={doLogout} style={{fontSize:'10px'}}>Logout</button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{maxWidth:'1280px',margin:'0 auto',padding:'28px 24px'}}>
+        <JobStatusBar status={jobStatus} jobId={jobId} error={jobError}/>
+        {result
+          ? <ResultView d={result} isLive={isLive}/>
+          : <EmptyState onLoad={loadMock}/>
+        }
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

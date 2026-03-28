@@ -19,6 +19,7 @@ import { correlationId } from './shared/middleware/correlationId.middleware';
 import { trackUsage } from './shared/middleware/trackUsage.middleware';
 import { requestLogger } from './shared/utils/logger';
 import { errorHandler } from './shared/utils/errors';
+import { env } from './shared/config/env';
 
 // Start BullMQ workers — must import to register the worker processes
 import './shared/queues/sentiment.worker';
@@ -39,7 +40,7 @@ app.post('/webhook/billing', express.raw({ type: 'application/json' }), handleWe
 // Global middleware — runs on every request
 app.use(helmet());        // security headers (X-Content-Type-Options, CSP, etc.)
 app.use(cors({
-  origin: (origin, cb) => {
+  origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
     const allowed = [
       env.DASHBOARD_URL,
       'http://localhost:3001',
