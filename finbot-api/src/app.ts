@@ -1,5 +1,6 @@
 import express from 'express';
 import helmet from 'helmet';
+import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import type { Request, Response } from 'express';
 import { healthRouter } from './modules/health';
@@ -37,6 +38,19 @@ app.post('/webhook/billing', express.raw({ type: 'application/json' }), handleWe
 
 // Global middleware — runs on every request
 app.use(helmet());        // security headers (X-Content-Type-Options, CSP, etc.)
+app.use(cors({
+  origin: (origin, cb) => {
+    const allowed = [
+      env.DASHBOARD_URL,
+      'http://localhost:3001',
+      'http://127.0.0.1:3001',
+    ];
+    // allow requests with no origin (curl, Postman, server-to-server)
+    if (!origin || allowed.includes(origin)) return cb(null, true);
+    cb(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  credentials: true,          // allow cookies (access_token, refresh_token)
+}));
 app.use(express.json());
 app.use(cookieParser());
 app.use(correlationId);   // assigns X-Correlation-Id header for tracing
