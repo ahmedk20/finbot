@@ -7,6 +7,9 @@ import { validate } from '../../shared/utils/validate';
 import { env } from '../../shared/config/env';
 
 const secureCookie = env.NODE_ENV !== 'development';
+// cross-origin dashboard (different domain/IP) requires sameSite:'none' + secure:true
+// in dev keep 'lax' so plain http://localhost works without HTTPS
+const sameSite = secureCookie ? 'none' : 'lax';
 
 // ── Controllers ───────────────────────────────────────────────────────────────
 
@@ -62,13 +65,13 @@ export async function dashboardLogin(req: Request, res: Response, next: NextFunc
     res.cookie('access_token', result.accessToken, {
       httpOnly: true,
       secure:   secureCookie,
-      sameSite: 'lax',
+      sameSite,
       maxAge:   15 * 60 * 1000,           // 15 minutes
     });
     res.cookie('refresh_token', result.refreshToken, {
       httpOnly: true,
       secure:   secureCookie,
-      sameSite: 'lax',
+      sameSite,
       maxAge:   7 * 24 * 60 * 60 * 1000, // 7 days
       path:     '/api/v1/auth/dashboard/refresh',
     });
@@ -87,13 +90,13 @@ export async function dashboardRefresh(req: Request, res: Response, next: NextFu
     res.cookie('access_token', result.accessToken, {
       httpOnly: true,
       secure:   secureCookie,
-      sameSite: 'lax',
+      sameSite,
       maxAge:   15 * 60 * 1000,
     });
     res.cookie('refresh_token', result.refreshToken, {
       httpOnly: true,
       secure:   secureCookie,
-      sameSite: 'lax',
+      sameSite,
       maxAge:   7 * 24 * 60 * 60 * 1000,
       path:     '/api/v1/auth/dashboard/refresh',
     });
