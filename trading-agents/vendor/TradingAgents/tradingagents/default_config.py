@@ -18,7 +18,7 @@ DEFAULT_CONFIG = {
     # Output language for analyst reports and final decision
     # Internal agent debate stays in English for reasoning quality
     # Examples: "English", "Arabic", "Chinese", "Spanish", "French"
-    "output_language": "English",
+    "output_language": "Arabic",
     # Debate and discussion settings
     "max_debate_rounds": 1,
     "max_risk_discuss_rounds": 1,
