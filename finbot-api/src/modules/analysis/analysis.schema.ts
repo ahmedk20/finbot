@@ -11,7 +11,7 @@ export const submitAnalysisSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD format')
     .optional()
     .default(() => new Date().toISOString().split('T')[0]),
-  output_language: z.string().min(1).max(50).optional().default('English'),
+  output_language: z.string().min(1).max(50).optional().default('Arabic'),
 });
 
 export type SubmitAnalysisInput = z.infer<typeof submitAnalysisSchema>;
