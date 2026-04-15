@@ -162,11 +162,21 @@ services:
     cap_drop:
       - ALL
     read_only: true
-    tmpfs:
-      - /tmp
-      - /app/vendor/TradingAgents/tradingagents/dataflows/data_cache
-      - /home/finbot/.cache
-      - /app/eval_results
+    volumes:
+      - type: tmpfs
+        target: /tmp
+      - type: tmpfs
+        target: /app/vendor/TradingAgents/tradingagents/dataflows/data_cache
+        tmpfs:
+          mode: 01777
+      - type: tmpfs
+        target: /home/finbot/.cache
+        tmpfs:
+          mode: 01777
+      - type: tmpfs
+        target: /app/eval_results
+        tmpfs:
+          mode: 01777
     deploy:
       resources:
         limits:
