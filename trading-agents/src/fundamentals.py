@@ -12,7 +12,15 @@ import yfinance as yf
 import logging
 from typing import Optional
 
+from src.yf_client import yf_retry
+
 logger = logging.getLogger(__name__)
+
+
+@yf_retry()
+def _fetch_info(ticker: str) -> dict:
+    stock = yf.Ticker(ticker.upper())
+    return stock.info
 
 
 def fetch(ticker: str) -> dict:
@@ -29,10 +37,8 @@ def fetch(ticker: str) -> dict:
     Raises:
         ValueError: if the ticker returns no data at all (bad symbol or delisted).
     """
-    stock = yf.Ticker(ticker.upper())
-
     try:
-        info = stock.info
+        info = _fetch_info(ticker)
     except Exception as e:
         raise ValueError(f"yfinance failed to fetch info for {ticker}: {e}") from e
 

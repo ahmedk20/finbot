@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     # FRED — free API key at fred.stlouisfed.org
     FRED_API_KEY: Optional[str] = None
 
+    # yfinance proxy — datacenter IPs are often blocked by Yahoo Finance.
+    # Set to an HTTP/HTTPS proxy URL (e.g. http://user:pass@host:port) to route
+    # yfinance requests through it. Omit to connect directly.
+    YFINANCE_PROXY: Optional[str] = None
+
     # TradingAgents config
     # Which provider TradingAgents uses for its own LLM calls
     TA_LLM_PROVIDER: str = "openai"          # openai | anthropic | google | xai | openrouter | ollama | groq

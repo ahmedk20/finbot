@@ -4,6 +4,8 @@ import pandas as pd
 import logging
 from typing import Optional
 
+from src.yf_client import yf_retry
+
 logger = logging.getLogger(__name__)
 
 # Map FinBot asset symbols → YFinance tickers
@@ -25,6 +27,7 @@ def _resolve_ticker(asset: str) -> str:
     return CRYPTO_MAP.get(upper, upper)  # fallback: pass through (handles stock tickers too)
 
 
+@yf_retry()
 def _fetch_ohlcv(ticker: str, period: str) -> pd.DataFrame:
     df = yf.download(ticker, period=period, auto_adjust=True, progress=False)
     if df.empty:

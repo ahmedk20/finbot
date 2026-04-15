@@ -15,6 +15,8 @@ from datetime import datetime, timedelta
 from typing import Optional
 import logging
 
+from src.yf_client import yf_retry
+
 logger = logging.getLogger(__name__)
 
 CRYPTO_MAP: dict[str, str] = {
@@ -82,8 +84,12 @@ def fetch(asset: str, event_date: str) -> dict:
     start = (event - timedelta(days=1)).strftime("%Y-%m-%d")
     end   = (event + timedelta(days=33)).strftime("%Y-%m-%d")
 
+    @yf_retry()
+    def _download():
+        return yf.download(ticker, start=start, end=end, auto_adjust=True, progress=False)
+
     try:
-        df = yf.download(ticker, start=start, end=end, auto_adjust=True, progress=False)
+        df = _download()
         if df.empty:
             raise ValueError(f"No price data for {ticker} around {event_date}")
 
