@@ -13,7 +13,8 @@ router.post('/dashboard/refresh', authController.dashboardRefresh);
 router.post('/dashboard/logout',  authController.dashboardLogout);
 
 // ── Developer auth (API clients — API key in Authorization header) ────────────
-router.post('/login',        authController.login);          // returns user info
+// First API key is created from the dashboard (JWT cookie via /dashboard/login);
+// thereafter clients authenticate with the API key in the Authorization header.
 router.get('/keys',          authenticate, authController.listApiKeys);
 router.post('/keys',         authenticate, authController.createApiKey);
 router.delete('/keys/:id',   authenticate, authController.revokeApiKey);

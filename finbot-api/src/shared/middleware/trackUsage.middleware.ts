@@ -15,7 +15,6 @@ function resolveEndpoint(req: Request): string {
   if (path === '/:id')                   return 'news.byId';
 
   // auth routes (for future — we may want to track these too)
-  if (path === '/login')                 return 'auth.login';
   if (path === '/keys' && method === 'get')    return 'auth.listKeys';
   if (path === '/keys' && method === 'post')   return 'auth.createKey';
   if (path.startsWith('/keys/') && method === 'delete') return 'auth.revokeKey';

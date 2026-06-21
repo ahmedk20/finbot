@@ -21,14 +21,6 @@ export async function register(req: Request, res: Response, next: NextFunction):
   } catch (err) { next(err); }
 }
 
-export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const input  = validate(loginSchema, req.body);
-    const result = await authService.login(input);
-    res.status(200).json(ok(result));
-  } catch (err) { next(err); }
-}
-
 export async function createApiKey(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const input  = validate(createKeySchema, req.body);

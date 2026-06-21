@@ -76,45 +76,6 @@ describe('register', () => {
   });
 });
 
-// ── login ─────────────────────────────────────────────────────────────────────
-
-describe('login', () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it('throws InvalidCredentials when user does not exist', async () => {
-    vi.mocked(authRepo.findUserByEmail).mockResolvedValue(null);
-
-    await expect(
-      authService.login({ email: 'ghost@example.com', password: 'anything' }),
-    ).rejects.toMatchObject({ code: 'UNAUTHORIZED', statusCode: 401 });
-  });
-
-  it('throws InvalidCredentials when password is wrong', async () => {
-    // bcrypt hash of "RightPassword1!"
-    vi.mocked(authRepo.findUserByEmail).mockResolvedValue(
-      makeUser({ password: '$2b$12$invalidhashfortimingsafety000000000000000000000' }),
-    );
-
-    await expect(
-      authService.login({ email: 'test@example.com', password: 'WrongPassword1!' }),
-    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
-  });
-
-  it('still runs comparePassword even when user is not found (timing attack prevention)', async () => {
-    // If we returned early on missing user, an attacker could measure response time
-    // to enumerate registered emails. The service must always call comparePassword.
-    vi.mocked(authRepo.findUserByEmail).mockResolvedValue(null);
-
-    const start = Date.now();
-    await authService.login({ email: 'ghost@example.com', password: 'anything' }).catch(() => {});
-    const elapsed = Date.now() - start;
-
-    // bcrypt with rounds=12 takes ~100ms+. A fast return (<20ms) indicates
-    // the compare was skipped — that's a timing attack vulnerability.
-    expect(elapsed).toBeGreaterThan(20);
-  });
-});
-
 // ── createApiKey ──────────────────────────────────────────────────────────────
 
 describe('createApiKey', () => {

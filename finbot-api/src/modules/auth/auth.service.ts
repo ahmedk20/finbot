@@ -28,23 +28,6 @@ export async function register(input: RegisterInput) {
   return { user };
 }
 
-export async function login(input: LoginInput) {
-  const user = await authRepo.findUserByEmail(input.email);
-
-  // Always compare even if user doesn't exist — prevents timing attacks
-  // that reveal whether an email is registered
-  // Valid bcrypt hash of a fixed placeholder — ensures comparePassword always runs
-  // (constant time) regardless of whether the user exists, preventing timing attacks.
-  const dummyHash = '$2b$12$LvuqPCPm1HQe6dn8JCwFwOIkZDCdFPBNElJSsbcHkTHAHPWvReq8e';
-  const match = await comparePassword(input.password, user?.password ?? dummyHash);
-
-  if (!user || !match) throw InvalidCredentials();
-
-  return {
-    user: { id: user.id, email: user.email, plan: user.plan, createdAt: user.createdAt },
-  };
-}
-
 // ── API Keys ──────────────────────────────────────────────────────────────────
 
 export async function createApiKey(userId: string, name?: string): Promise<CreatedApiKey> {
